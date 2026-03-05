@@ -1,0 +1,37 @@
+             name: Gitlab Sync
+  # You may pin to the exact commit or the version.
+  # uses: action-pack/gitlab-sync@c202efd79aae3364f57e7f7046f224edf6facd88
+  uses: action-pack/gitlab-sync@v3
+  with:
+    # GitLab repo URL
+    url: https://github.com/Basitech-sms/Basitech-fe.git
+    # GitLab username
+    username: emiben027
+    # GitLab token
+    token: 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
+
+
+    stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  MY_VARIABLE: "some_value"
+
+build:
+  stage: build
+  script:
+    - echo "Building something..."
+
+test:
+  stage: test
+  script:
+    - echo "Running tests..."
+
+deploy:
+  stage: deploy
+  script:
+    - echo "Deploying to production..."
+
+          

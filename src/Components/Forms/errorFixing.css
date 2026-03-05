@@ -1,0 +1,29 @@
+.css-1d3z3hw-MuiOutlinedInput-notchedOutline {
+  border: none !important;
+}
+
+.react-tel-input .flag-dropdown.open .selected-flag:focus {
+  background-color: #f7f8f8;
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+}
+.react-tel-input .flag-dropdown.open .selected-flag {
+  background-color: #f7f8f8;
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+}
+.css-1gwyjbq-MuiTableCell-root {
+  text-transform: none !important;
+}
+.transition-transform {
+  transition: transform 0.3s;
+}
+
+.rotate-180 {
+  transform: rotate(90deg);
+}
+
+.dropdown-content {
+  width: calc(100% - 16px);
+  left: 0;
+}

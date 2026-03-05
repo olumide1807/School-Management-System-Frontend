@@ -1,0 +1,20 @@
+there might be merge conflict in the admission  in school management due to i exported some array from there.
+
+ <FilterComponent
+          menuOptions={menuOptionsLevel}
+          choice={choiceLevel}
+          setChoice={setChoiceLevel}
+        />
+        <FilterComponent
+          menuOptions={menuOptionsArm}
+          choice={choiceArm}
+          setChoice={setChoiceArm}
+        />
+
+
+i exported the menuOptionsArm and menuOptionsLevel in the admission.
+
+IN THE MANUAL UPLOAD MODAL -- 
+1. I fixed the BUTTON COLOR TO work based on the active btn, so grey for inactive and blue for active.
+
+Ok..
