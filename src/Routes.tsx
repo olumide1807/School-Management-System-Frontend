@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 
 //auth
 import Register from "./Pages/Auth/Register";
@@ -157,8 +157,8 @@ function AllRoutes() {
     //   />
     // </Routes>
     <Routes>
-      {/* DashBoard Screens */}
-      <Route path="/" element={<DashboardLayout />}>
+      {/* DashBoard Screens - Protected: redirect to /login if not authenticated */}
+      <Route path="/" element={currentUser ? <DashboardLayout /> : <Navigate to="/login" />}>
         <Route path="school-management/">
           <Route index element={<AdminDashboard />} />
           <Route path="academics" element={<Academics />} />
@@ -183,12 +183,12 @@ function AllRoutes() {
         <Route path="settings" element={<Settings />} />
       </Route>
 
-      {/* Auth Screens */}
-      <Route path="register" element={<Register />} />
-      <Route path="login" element={<Login />} />
-      <Route path="reset-password" element={<ResetPassword />} />
-      <Route path="verify-otp" element={<VerifyOtp />} />
-      <Route path="forgot-password" element={<ForgotPassword />} />
+      {/* Auth Screens - redirect to / if already logged in */}
+      <Route path="register" element={!currentUser ? <Register /> : <Navigate to="/" />} />
+      <Route path="login" element={!currentUser ? <Login /> : <Navigate to="/" />} />
+      <Route path="reset-password" element={!currentUser ? <ResetPassword /> : <Navigate to="/" />} />
+      <Route path="verify-otp" element={!currentUser ? <VerifyOtp /> : <Navigate to="/" />} />
+      <Route path="forgot-password" element={!currentUser ? <ForgotPassword /> : <Navigate to="/" />} />
     </Routes>
   );
 }

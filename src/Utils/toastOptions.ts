@@ -4,4 +4,4 @@ export const toastOptions = {
   pauseOnHover: true,
   autoClose: 4000,
   theme: "light",
-};
+} as const;

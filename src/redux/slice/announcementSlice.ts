@@ -16,14 +16,14 @@ export const deleteAnnouncement = createAsyncThunk(
     try {
       const response = await SERVER.delete(`announcement/${id}`);
       if (response.data) {
-        toast.success('Deleted successfully!', { toastOptions });
+        toast.success('Deleted successfully!', toastOptions);
         return id;
       } else {
-        toast.error('Unable to delete, please try again later', { toastOptions });
+        toast.error('Unable to delete, please try again later', toastOptions);
         return rejectWithValue('Unable to delete');
       }
     } catch (error) {
-      toast.error('Failed to delete!', { toastOptions });
+      toast.error('Failed to delete!', toastOptions);
       return rejectWithValue(error.response.data);
     }
   }

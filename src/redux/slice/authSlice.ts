@@ -12,14 +12,14 @@ const initialState = {
 
 const login = createAsyncThunk(
 	'auth/login',
-	async (user, { rejectWithValues }) => {
+	async (user, { rejectWithValue }) => {
 		try {
 			const res = await SERVER.post('superadmin/login', user);
 			const token = res.data.token;
 			sessionStorage.setItem('token', token)
 			return token;
 		} catch (error) {
-			return rejectWithValues(error);
+			return rejectWithValue(error);
 		}
 	}
 )
@@ -31,6 +31,12 @@ const authSlice = createSlice({
 	reducers: {
 		setToken: (state, action) => {
 			state.token = action.payload;
+		},
+		logOut: (state) => {
+			state.token = null;
+			state.status = 'idle';
+			state.error = false;
+			sessionStorage.removeItem('token');
 		}
 	},
 
@@ -40,19 +46,19 @@ const authSlice = createSlice({
 				state.status = 'pending';
 			})
 		builder
-			.addCase(login.fulfilled, (state) => {
+			.addCase(login.fulfilled, (state, action) => {
 				state.status = 'succeeded';
 				state.token = action.payload;
-				toast.success('Login successfully!', {toastOptions})
+				toast.success('Login successfully!', toastOptions)
 			})
 		builder
 			.addCase(login.rejected, (state) => {
 				state.status = 'failed';
-				toast.success('Failed to login in!', {toastOptions})
+				toast.error('Failed to login!', toastOptions)
 			})
 	}
 });
 
-export const { setToken } = authSlice.actions;
+export const { setToken, logOut } = authSlice.actions;
 
 export default authSlice.reducer;

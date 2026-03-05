@@ -67,17 +67,17 @@ const CreateOrEditAnnouncement = ({ openModal, closeModal, isEditing, announceme
     try {
       setLoading(true);
       if(title?.length < 7){
-        toast.error('Announcement Title must be at least 7 characters!', { toastOptions });
+        toast.error('Announcement Title must be at least 7 characters!', toastOptions);
         return;
       }
       
       if(description?.length < 20){
-        toast.error('Description must be at least 20 characters!', { toastOptions });
+        toast.error('Description must be at least 20 characters!', toastOptions);
         return;
       }
 
       if(startDate > endDate){
-        toast.error('Start Date must not be greater than End Date of announcement!', { toastOptions });
+        toast.error('Start Date must not be greater than End Date of announcement!', toastOptions);
         return;
       }
 
@@ -108,10 +108,10 @@ const CreateOrEditAnnouncement = ({ openModal, closeModal, isEditing, announceme
     } catch (error) {
       setLoading(false);
       if(error?.response?.status === 409){
-        toast.error('Announcement already exists!', { toastOptions })
+        toast.error('Announcement already exists!', toastOptions)
         setError("Announcement with this title already exists. Please choose a different title");
       } else {
-        toast.error('Unable to create announcement, please try again!', { toastOptions })
+        toast.error('Unable to create announcement, please try again!', toastOptions)
         setError("Unable to create announcement, please try again");
       } 
     } finally{
@@ -210,4 +210,4 @@ const CreateOrEditAnnouncement = ({ openModal, closeModal, isEditing, announceme
   );
 }
 
-export default CreateOrEditAnnouncement
+export default CreateOrEditAnnouncement;

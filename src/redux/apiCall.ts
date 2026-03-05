@@ -9,7 +9,7 @@ export const login = async (dispatch, user) => {
 
     dispatch(loginStart());
     try {
-        const res = await axios.post(API_URL + 'superadmin/login', user)
+        const res = await axios.post(API_URL + '/superadmin/login', user)
 
         if(res.data){
             toast.success('Login successfully!', { toastOptions })

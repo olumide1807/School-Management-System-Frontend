@@ -62,12 +62,12 @@ const schoolDetailsSlice = createSlice({
       .addCase(submitDetails.fulfilled, (state, action) => {
         state.status = "succeeded";
         state.details = action.payload;
-        toast.success("Successful!", { toastOptions });
+        toast.success("Successful!", toastOptions);
       })
       .addCase(submitDetails.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.error;
-        toast.error("Failed!, Please try again later", { toastOptions });
+        toast.error("Failed!, Please try again later", toastOptions);
       })
 
       //delete details
@@ -77,12 +77,12 @@ const schoolDetailsSlice = createSlice({
       .addCase(deleteAcctDetails.fulfilled, (state, action) => {
         state.status = "succeeded";
         state.details = action.payload;
-        toast.success("Successful!", { toastOptions });
+        toast.success("Successful!", toastOptions);
       })
       .addCase(deleteAcctDetails.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.error;
-        toast.error("Failed!, Please try again later", { toastOptions });
+        toast.error("Failed!, Please try again later", toastOptions);
       })
 
       //get school account details

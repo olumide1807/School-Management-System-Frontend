@@ -40,26 +40,31 @@ const Register = () => {
     });
 	
 
-	const stepComponents = {
+	const stepComponents: Record<string, JSX.Element> = {
 		personal: <PersonalDetails formData={formData} setFormData={setFormData}/>,
 		school: <SchoolDetails formData={formData} setFormData={setFormData}/>,
 	};
 
 
 
-	const handleSubmit = async (e) => {
+	const [successMessage, setSuccessMessage] = useState('');
+
+	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
 		setLoading(true)
+		setError('')
 
 		try {
-			const res = await axios.post(API_URL + 'superadmin/register', formData)
+			const res = await axios.post(API_URL + '/superadmin/register', formData)
 
 			if(res.data){
-				return res.data && setSuccess(true); 
+				setSuccessMessage(res.data.message || 'Registration successful!');
+				return setSuccess(true); 
 			} 
-		} catch (error) {
-			console.error(error)
-			setError('Something went wrong! please try again later');
+		} catch (err: any) {
+			console.error(err)
+			const errMsg = err?.response?.data?.error || err?.response?.data?.message || 'Something went wrong! please try again later';
+			setError(errMsg);
 			setLoading(false)
 		} finally {
 			setLoading(false)
@@ -152,7 +157,7 @@ const Register = () => {
 
 							) : (
 								<div className="mt-[2px]">
-									<Button1 text='Register' type='submit'/>
+									<Button1 text='Register' type='submit' loading={loading} onClick={() => {}}/>
 	
 								{ error && <ErrorMsg text={error}/>	}
 
@@ -168,7 +173,7 @@ const Register = () => {
 				open={success} 
 				setSuccess={setSuccess}
 				desc='Registration Successful!' 
-				message={`An email has been sent to ${formData.emailAddress}` }
+				message={successMessage}
 				url='/login'
 				btn='Login'
 				/>

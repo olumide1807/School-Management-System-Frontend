@@ -55,7 +55,7 @@ const AdminDashboard = () => {
   const currTerm = session?.data?.data?.data?.term?.termName;
   console.log(currTerm);
   
-  const { data: announcementData } = useGetAnnoucement();
+  const { data: announcementData, refetch: refetchAnnouncements } = useGetAnnoucement();
   const announcements = announcementData?.data?.data;
 
   const { status, details, error } = useSelector((state) => state.schoolDetails);
@@ -66,11 +66,12 @@ const AdminDashboard = () => {
 
 
   const deleteSchoolDetails = async () => {
-      dispatch(deleteAcctDetails(details));
+      await dispatch(deleteAcctDetails(details));
+      dispatch(getSchDetails());
   }
 
   const EditAcctDetails = () => {
-    setEditDetails(acctDetails);
+    setEditDetails(details?.data);
     setOpenSchAcctModal(true);
   }
 
@@ -203,13 +204,19 @@ const AdminDashboard = () => {
 
       <CreateOrEditAnnouncement
         openModal={openCreateModal}
-        closeModal={() => setOpenCreateModal(false)}
+        closeModal={() => {
+          setOpenCreateModal(false);
+          refetchAnnouncements();
+        }}
         isEditing={isEditing}
-        setIsEditing={setIsEditing}
+        announcement={null}
       />
       <SchoolAccModal
         openModal={openSchAcctModal}
-        closeModal={() => setOpenSchAcctModal(false)}
+        closeModal={() => {
+          setOpenSchAcctModal(false);
+          setEditDetails(null);
+        }}
         editDetails={editDetails}
       />
      

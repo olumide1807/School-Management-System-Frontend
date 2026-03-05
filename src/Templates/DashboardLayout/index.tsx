@@ -32,6 +32,8 @@ export default function DashboardLayout() {
 
   const handleLogout = () => {
     dispatch(logout());
+    sessionStorage.removeItem("token");
+    window.location.href = "/login";
   };
   const scrollRef = useRef<HTMLDivElement>(null);
   const isSchoolManagementActive =

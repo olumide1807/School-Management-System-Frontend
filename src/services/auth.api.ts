@@ -1,14 +1,11 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-
-const API_URL = "https://sms-l7y1.onrender.com";
-
-//localhost:5002/superadmin/register
+import { API_URL } from "../Utils/apiRoute";
 
 const baseQuery = fetchBaseQuery({
 	baseUrl: API_URL,
 	prepareHeaders: (headers, { getState }) => {
 		headers.set("Accept", `application/json`);
-		const token = getState().auth.token;
+		const token = (getState() as any).auth.token;
 		if (token) headers.append("authorization", `Bearer ${token}`);
 		return headers;
 	},
@@ -22,7 +19,7 @@ export const authApi = createApi({
 		// USERS
 		registerSuperAdmin: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/superadmin/register`,
+				url: `/superadmin/register`,
 				method: "POST",
 				body,
 			}),
@@ -30,7 +27,7 @@ export const authApi = createApi({
 		}),
 		loginSuperAdmin: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/superadmin/login`,
+				url: `/superadmin/login`,
 				method: "POST",
 				body,
 			}),
@@ -38,7 +35,7 @@ export const authApi = createApi({
 		}),
 		loginStaff: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/staff/login`,
+				url: `/staff/login`,
 				method: "POST",
 				body,
 			}),
@@ -46,7 +43,7 @@ export const authApi = createApi({
 		}),
 		updateSAPassword: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/superadmin/updatepassword`,
+				url: `/superadmin/updatepassword`,
 				method: "PUT",
 				body,
 			}),
@@ -54,7 +51,7 @@ export const authApi = createApi({
 		}),
 		updateStaffPassword: builder.mutation({
 			query: (id, body) => ({
-				url: `https://sms-l7y1.onrender.com/staff/${id}/password`,
+				url: `/staff/${id}/password`,
 				method: "PUT",
 				body,
 			}),
@@ -62,7 +59,7 @@ export const authApi = createApi({
 		}),
 		logout: builder.query({
 			query: () => ({
-				url: `https://sms-l7y1.onrender.com/logout`,
+				url: `/logout`,
 			}),
 			providesTags: ["auth"],
 		}),

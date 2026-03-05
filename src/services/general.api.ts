@@ -1,13 +1,12 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { logOut } from "../redux/slice/authSlice";
-
-const API_URL = "https://sms-l7y1.onrender.com";
+import { API_URL } from "../Utils/apiRoute";
 
 const baseQuery = fetchBaseQuery({
 	baseUrl: API_URL,
 	prepareHeaders: (headers, { getState }) => {
 		headers.set("Accept", `application/json`);
-		const token = getState().auth.token;
+		const token = (getState() as any).auth.token;
 		if (token) {
 			headers.set("authorization", `Bearer ${token}`);
 			headers.set("Access-Control-Allow-Origin", `*`);
@@ -40,7 +39,6 @@ export const generalApi = createApi({
 		"staff",
 		"profile",
 		"class",
-		"staff",
 		"announcement",
 		"timetable",
 		"session",
@@ -48,18 +46,19 @@ export const generalApi = createApi({
 		"student",
 		"parent",
 		"grade",
+		"subject",
 	],
 	endpoints: (builder) => ({
 		// SUPER ADMIN
 		getSAProfile: builder.query({
 			query: () => ({
-				url: `https://sms-l7y1.onrender.com/superadmin/profile`,
+				url: `/superadmin/profile`,
 			}),
 			providesTags: ["profile"],
 		}),
 		updateSAProfile: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/superadmin/profile`,
+				url: `/superadmin/profile`,
 				method: "PUT",
 				body,
 			}),
@@ -68,7 +67,7 @@ export const generalApi = createApi({
 		// STAFF
 		createStaff: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/staff/createstaff`,
+				url: `/staff/createstaff`,
 				method: "POST",
 				body,
 			}),
@@ -76,19 +75,19 @@ export const generalApi = createApi({
 		}),
 		getAllStaff: builder.query({
 			query: () => ({
-				url: `https://sms-l7y1.onrender.com/staff`,
+				url: `/staff`,
 			}),
 			providesTags: ["staff"],
 		}),
 		getStaffById: builder.query({
 			query: (id) => ({
-				url: `https://sms-l7y1.onrender.com/staff/${id}`,
+				url: `/staff/${id}`,
 			}),
 			providesTags: ["staff"],
 		}),
 		updateStaffInfo: builder.mutation({
 			query: (id, body) => ({
-				url: `https://sms-l7y1.onrender.com/staff/${id}`,
+				url: `/staff/${id}`,
 				method: "PUT",
 				body,
 			}),
@@ -96,7 +95,7 @@ export const generalApi = createApi({
 		}),
 		assignClass: builder.mutation({
 			query: (id, body, param) => ({
-				url: `https://sms-l7y1.onrender.com/staff/assignClass/${id}`,
+				url: `/staff/assignClass/${id}`,
 				method: "PUT",
 				body,
 				param,
@@ -106,7 +105,7 @@ export const generalApi = createApi({
 		// ANNOUNCEMENTS
 		createAnnouncement: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/announcement/create`,
+				url: `/announcement/create`,
 				method: "POST",
 				body,
 			}),
@@ -114,19 +113,19 @@ export const generalApi = createApi({
 		}),
 		getAllAnnouncement: builder.query({
 			query: () => ({
-				url: `https://sms-l7y1.onrender.com/announcement`,
+				url: `/announcement`,
 			}),
 			providesTags: ["announcement"],
 		}),
 		getAnnouncementById: builder.query({
 			query: (id) => ({
-				url: `https://sms-l7y1.onrender.com/announcement/${id}`,
+				url: `/announcement/${id}`,
 			}),
 			providesTags: ["announcement"],
 		}),
 		updateAnnouncement: builder.mutation({
 			query: (id, body) => ({
-				url: `https://sms-l7y1.onrender.com/announcement/${id}`,
+				url: `/announcement/${id}`,
 				method: "PUT",
 				body,
 			}),
@@ -134,7 +133,7 @@ export const generalApi = createApi({
 		}),
 		deleteAnnouncement: builder.mutation({
 			query: (id, body) => ({
-				url: `https://sms-l7y1.onrender.com/announcement/${id}`,
+				url: `/announcement/${id}`,
 				method: "DELETE",
 				body,
 			}),
@@ -143,7 +142,7 @@ export const generalApi = createApi({
 		// CLASS
 		createClass: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/class/create`,
+				url: `/class/create`,
 				method: "POST",
 				body,
 			}),
@@ -151,7 +150,7 @@ export const generalApi = createApi({
 		}),
 		createClassArms: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/class/createArms`,
+				url: `/class/createArms`,
 				method: "POST",
 				body,
 			}),
@@ -159,7 +158,7 @@ export const generalApi = createApi({
 		}),
 		updateClassLevel: builder.mutation({
 			query: (id, body) => ({
-				url: `https://sms-l7y1.onrender.com/class/update/${id}`,
+				url: `/class/update/${id}`,
 				method: "PUT",
 				body,
 			}),
@@ -167,7 +166,7 @@ export const generalApi = createApi({
 		}),
 		updateClassArm: builder.mutation({
 			query: (id, body) => ({
-				url: `https://sms-l7y1.onrender.com/class/update/arm/${id}`,
+				url: `/class/update/arm/${id}`,
 				method: "PUT",
 				body,
 			}),
@@ -175,7 +174,7 @@ export const generalApi = createApi({
 		}),
 		deleteClassArm: builder.mutation({
 			query: (id, body) => ({
-				url: `https://sms-l7y1.onrender.com/class/delete/arm/${id}`,
+				url: `/class/delete/arm/${id}`,
 				method: "DELETE",
 				body,
 			}),
@@ -183,7 +182,7 @@ export const generalApi = createApi({
 		}),
 		deleteClassLevel: builder.mutation({
 			query: (id, body) => ({
-				url: `https://sms-l7y1.onrender.com/class/delete/${id}`,
+				url: `/class/delete/${id}`,
 				method: "DELETE",
 				body,
 			}),
@@ -191,32 +190,32 @@ export const generalApi = createApi({
 		}),
 		getAllClassLevels: builder.query({
 			query: () => ({
-				url: `https://sms-l7y1.onrender.com/class?find=level`,
+				url: `/class?find=level`,
 			}),
 			providesTags: ["class"],
 		}),
 		getClassLevelById: builder.query({
 			query: (id) => ({
-				url: `https://sms-l7y1.onrender.com/class/${id}?find=level`,
+				url: `/class/${id}?find=level`,
 			}),
 			providesTags: ["class"],
 		}),
 		getAllClassArms: builder.query({
 			query: () => ({
-				url: `https://sms-l7y1.onrender.com/class?find=arm`,
+				url: `/class?find=arm`,
 			}),
 			providesTags: ["class"],
 		}),
 		getClassArmById: builder.query({
 			query: (id) => ({
-				url: `https://sms-l7y1.onrender.com/class/${id}?find=arm`,
+				url: `/class/${id}?find=arm`,
 			}),
 			providesTags: ["class"],
 		}),
 		// SUBJECT
 		createSubject: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/subject/create`,
+				url: `/subject/create`,
 				method: "POST",
 				body,
 			}),
@@ -224,7 +223,7 @@ export const generalApi = createApi({
 		}),
 		addSubject: builder.mutation({
 			query: (body, id) => ({
-				url: `https://sms-l7y1.onrender.com/subject/create/specific/${id}`,
+				url: `/subject/create/specific/${id}`,
 				method: "POST",
 				body,
 			}),
@@ -232,7 +231,7 @@ export const generalApi = createApi({
 		}),
 		updateSubject: builder.mutation({
 			query: (body, id) => ({
-				url: `https://sms-l7y1.onrender.com/subject/${id}?find=specificSubject`,
+				url: `/subject/${id}?find=specificSubject`,
 				method: "PUT",
 				body,
 			}),
@@ -240,7 +239,7 @@ export const generalApi = createApi({
 		}),
 		deleteSubject: builder.mutation({
 			query: (body, id) => ({
-				url: `https://sms-l7y1.onrender.com/subject/${id}?find=subject`,
+				url: `/subject/${id}?find=subject`,
 				method: "DELETE",
 				body,
 			}),
@@ -248,33 +247,33 @@ export const generalApi = createApi({
 		}),
 		getAllSpecificSubjectsInClass: builder.query({
 			query: (id) => ({
-				url: `https://sms-l7y1.onrender.com/subject/all-subjects-in-a-class/${id}`,
+				url: `/subject/all-subjects-in-a-class/${id}`,
 			}),
 			providesTags: ["subject"],
 		}),
 		getAllSpecificSubjectsUnderSubject: builder.query({
 			query: (id) => ({
-				url: `https://sms-l7y1.onrender.com/subject/all-specificSujects-under-a-subject/${id}`,
+				url: `/subject/all-specificSujects-under-a-subject/${id}`,
 			}),
 			providesTags: ["subject"],
 		}),
 		getSubjectById: builder.query({
 			query: (id) => ({
-				url: `https://sms-l7y1.onrender.com/subject/${id}?find=subject`,
+				url: `/subject/${id}?find=subject`,
 			}),
 			providesTags: ["subject"],
 		}),
 		// TIMETABLE
 		getTimetable: builder.query({
 			query: (id, param) => ({
-				url: `https://sms-l7y1.onrender.com/timetable/${id}`,
+				url: `/timetable/${id}`,
 				param,
 			}),
 			providesTags: ["timetable"],
 		}),
 		createTimetable: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/timetable/create`,
+				url: `/timetable/create`,
 				method: "POST",
 				body,
 			}),
@@ -282,7 +281,7 @@ export const generalApi = createApi({
 		}),
 		setPeriodTimetable: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/timetable/set-period-time`,
+				url: `/timetable/set-period-time`,
 				method: "POST",
 				body,
 			}),
@@ -290,7 +289,7 @@ export const generalApi = createApi({
 		}),
 		updateTimetable: builder.mutation({
 			query: (body, id, param) => ({
-				url: `https://sms-l7y1.onrender.com/timetable/${id}`,
+				url: `/timetable/${id}`,
 				method: "POST",
 				body,
 				param,
@@ -299,7 +298,7 @@ export const generalApi = createApi({
 		}),
 		deleteTimetable: builder.mutation({
 			query: (body, id, param) => ({
-				url: `https://sms-l7y1.onrender.com/timetable/${id}`,
+				url: `/timetable/${id}`,
 				method: "POST",
 				body,
 				param,
@@ -309,7 +308,7 @@ export const generalApi = createApi({
 		// SESSION
 		createSession: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/session/create`,
+				url: `/session/create`,
 				body,
 			}),
 			invalidatesTags: ["session"],
@@ -318,7 +317,7 @@ export const generalApi = createApi({
 		// PARENT
 		createParent: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/parent`,
+				url: `/parent`,
 				method: "POST",
 				body,
 			}),
@@ -326,7 +325,7 @@ export const generalApi = createApi({
 		}),
 		editParent: builder.mutation({
 			query: (body, id) => ({
-				url: `https://sms-l7y1.onrender.com/parent/${id}`,
+				url: `/parent/${id}`,
 				method: "PUT",
 				body,
 			}),
@@ -334,7 +333,7 @@ export const generalApi = createApi({
 		}),
 		linkStudent: builder.mutation({
 			query: (body, id) => ({
-				url: `https://sms-l7y1.onrender.com/parent/student/link/${id}`,
+				url: `/parent/student/link/${id}`,
 				method: "PUT",
 				body,
 			}),
@@ -342,7 +341,7 @@ export const generalApi = createApi({
 		}),
 		deleteParent: builder.mutation({
 			query: (body, id) => ({
-				url: `https://sms-l7y1.onrender.com/parent/${id}`,
+				url: `/parent/${id}`,
 				method: "DELETE",
 				body,
 			}),
@@ -350,14 +349,14 @@ export const generalApi = createApi({
 		}),
 		getAllParents: builder.query({
 			query: () => ({
-				url: `https://sms-l7y1.onrender.com/parent?type=linked`,
+				url: `/parent?type=linked`,
 			}),
 			providesTags: ["admission", "parent"],
 		}),
 		// STUDENT
 		registerStudent: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/student/register`,
+				url: `/student/register`,
 				method: "POST",
 				body,
 			}),
@@ -365,7 +364,7 @@ export const generalApi = createApi({
 		}),
 		linkGuardian: builder.mutation({
 			query: (body, id) => ({
-				url: `https://sms-l7y1.onrender.com/student/guardian/link/${id}`,
+				url: `/student/guardian/link/${id}`,
 				method: "PUT",
 				body,
 			}),
@@ -373,7 +372,7 @@ export const generalApi = createApi({
 		}),
 		editStudent: builder.mutation({
 			query: (body, id) => ({
-				url: `https://sms-l7y1.onrender.com/student/${id}`,
+				url: `/student/${id}`,
 				method: "PUT",
 				body,
 			}),
@@ -381,7 +380,7 @@ export const generalApi = createApi({
 		}),
 		deleteStudent: builder.mutation({
 			query: (body, id) => ({
-				url: `https://sms-l7y1.onrender.com/student/${id}`,
+				url: `/student/${id}`,
 				method: "DELETE",
 				body,
 			}),
@@ -389,7 +388,7 @@ export const generalApi = createApi({
 		}),
 		activateDeactivateStudent: builder.mutation({
 			query: (body, id, status) => ({
-				url: `https://sms-l7y1.onrender.com/student/${status}/${id}`,
+				url: `/student/${status}/${id}`,
 				method: "PUT",
 				body,
 			}),
@@ -397,14 +396,14 @@ export const generalApi = createApi({
 		}),
 		getAllStudents: builder.query({
 			query: () => ({
-				url: `https://sms-l7y1.onrender.com/student`,
+				url: `/student`,
 			}),
 			providesTags: ["admission", "student"],
 		}),
 		// GRADE
 		createGrade: builder.mutation({
 			query: (body) => ({
-				url: `https://sms-l7y1.onrender.com/grade/create`,
+				url: `/grade/create`,
 				method: "POST",
 				body,
 			}),
@@ -412,7 +411,7 @@ export const generalApi = createApi({
 		}),
 		getGradeById: builder.query({
 			query: (id) => ({
-				url: `https://sms-l7y1.onrender.com/grade/${id}`,
+				url: `/grade/${id}`,
 			}),
 			providesTags: ["grade"],
 		}),

@@ -19,14 +19,17 @@ const AllAnnouncement = ({ openModal, closeModal }) => {
   const [editAnnouncement, setEditAnnouncement] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  const { data, error, isPending } = useGetAnnoucement();
+  const { data, error, isPending, refetch } = useGetAnnoucement();
 
   const { announcements } = useSelector((state) => state.announcements)
 
   const dispatch = useDispatch();
 
   const handleDelete = async (id) => {
-      dispatch(deleteAnnouncement(id))
+      dispatch(deleteAnnouncement(id)).then(() => {
+        refetch();
+        setOpenDelAnnouncement(false);
+      });
   };
     
     
@@ -149,6 +152,7 @@ export const OneAnnouncement = ({ open, close, announcement }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const dispatch = useDispatch();
+  const { refetch } = useGetAnnoucement();
 
 
   const handleEdit = (i) => {
@@ -162,8 +166,10 @@ export const OneAnnouncement = ({ open, close, announcement }) => {
   };
   
   const handleDelete = async (id) => {
-    dispatch(deleteAnnouncement(id))
-    close();
+    dispatch(deleteAnnouncement(id)).then(() => {
+      refetch();
+      close();
+    });
   };
 
   return (

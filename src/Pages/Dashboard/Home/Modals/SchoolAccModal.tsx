@@ -4,13 +4,18 @@ import { Notice } from "../../../../Components/Vectors";
 import {
   setDetails,
   submitDetails,
+  getSchDetails,
 } from "../../../../redux/slice/schoolDetail";
 import Modal from "../../../../Components/Modals";
 import {  Input } from "../../../../Components/Forms";
 import { useDispatch, useSelector } from "react-redux";
 import InputField from "../../../../Components/Forms/InputField";
 
-
+interface SchoolAccModalProps {
+  openModal: boolean;
+  closeModal: () => void;
+  editDetails: any;
+}
 
 const initialState = {
   schoolAccountDetails: {
@@ -21,10 +26,10 @@ const initialState = {
   },
 }
 
-const SchoolAccountDetails = ({ openModal, closeModal, editDetails }) => {
+const SchoolAccountDetails = ({ openModal, closeModal, editDetails }: SchoolAccModalProps) => {
 
   const [accountDetails, setAccountDetails] = useState(initialState);
-  const { status } = useSelector((state) => state.schoolDetails);
+  const { status } = useSelector((state: any) => state.schoolDetails);
 
 
   useEffect(() => {
@@ -34,9 +39,9 @@ const SchoolAccountDetails = ({ openModal, closeModal, editDetails }) => {
   }, [editDetails]);
 
 
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<any>();
 
-  const handleDetailsChange = (e) => {
+  const handleDetailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setAccountDetails((prevDetails) => ({
       ...prevDetails,
@@ -47,10 +52,11 @@ const SchoolAccountDetails = ({ openModal, closeModal, editDetails }) => {
     }));
   };
 
-  const onSubmitSchAcct = async (e) => {
+  const onSubmitSchAcct = async (e: React.FormEvent) => {
     e.preventDefault();
       dispatch(setDetails(accountDetails));
       await dispatch(submitDetails(accountDetails)).unwrap();
+      await dispatch(getSchDetails());
       closeModal()
     } 
 
@@ -79,7 +85,6 @@ const SchoolAccountDetails = ({ openModal, closeModal, editDetails }) => {
         <InputField
           name="accountNumber"
           placeholder="E.g 0123456789"
-          acc
           otherClass="border border-[#ABABAB] rounded-[10px]"
           label="Account Number"
           required={true}
