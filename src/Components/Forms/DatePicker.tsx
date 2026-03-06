@@ -1,9 +1,10 @@
 import { DatePicker } from '@mui/x-date-pickers';
 import { useState } from 'react';
 
-const DatePickerField = ({label, maxDate, minDate, placeholder, defaultValue, dateRange, name, onChange }) => {
+const DatePickerField = ({label, maxDate, minDate, placeholder, defaultValue, dateRange, name, onChange, value: externalValue }) => {
 
-    const [value, setValue] = useState(null);
+    const [internalValue, setInternalValue] = useState(null);
+    const value = externalValue !== undefined && externalValue !== '' ? (externalValue instanceof Date ? externalValue : new Date(externalValue)) : internalValue;
 
   return (
     <div className="w-full border-black">
@@ -22,10 +23,12 @@ const DatePickerField = ({label, maxDate, minDate, placeholder, defaultValue, da
             name={name}
             placeholder={placeholder}
             format="dd/MM/yyyy"
-            value={value}
+            value={value && !isNaN(new Date(value).getTime()) ? new Date(value) : null}
             disableOpenPicker={false}
-            onChange={(date)=> onChange(date)}
-            setValue={setValue}
+            onChange={(date) => {
+              setInternalValue(date);
+              onChange(date);
+            }}
         />
 
         </div>
@@ -33,4 +36,4 @@ const DatePickerField = ({label, maxDate, minDate, placeholder, defaultValue, da
   )
 }
 
-export default DatePickerField
+export default DatePickerField;

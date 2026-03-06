@@ -37,10 +37,7 @@ export default function BasicTable({ headcells, tableData, onClick, sideIcon }) 
 						<TableRow key={rowIndex}>
 							{headcells?.map((col, colIndex) => (
 								<TableCell align="left" key={colIndex} sx={{ fontWeight: 500, fontSize: 13 }}>
-									{col.key === 'termStartDate' || col.key === 'termEndDate' ? 
-										moment(row[col.key]).format('DD/MM/YYYY') :
-										row[col.key]
-									}
+									{row[col.key]}
 								</TableCell>
 							))}
 							{ sideIcon &&

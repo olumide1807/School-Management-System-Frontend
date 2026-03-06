@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { MenuItem, Checkbox } from "@mui/material";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
@@ -36,6 +36,22 @@ export default function FilterComponent({
   setMultiSelect,
 }: FilterComponentProps) {
   const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownOpen]);
 
   const menuOption: MenuOption[] = [
     {
@@ -49,7 +65,7 @@ export default function FilterComponent({
   ];
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <label className="block mb-2 font-bold text-gray-700">{label}</label>
       <div
         className={`flex flex-col relative border border-[#ABABAB] rounded-[5px] min-w-[163px] ${otherClasses}`}
@@ -91,11 +107,14 @@ export default function FilterComponent({
             value={menu.value}
             sx={{ padding: "8px", width: "100%" }}
             onClick={() => {
-              !multiSelect && setDropdownOpen(false);
-              // setChoice(menu.value);
               if (multiSelect) {
-                !multiSelect && menu.handleClick
-                  ? menu.handleClick?.(menu.value)
+                menu.handleClick
+                  ? menu.handleClick(menu.value)
+                  : setChoice?.(menu.value);
+              } else {
+                setDropdownOpen(false);
+                menu.handleClick
+                  ? menu.handleClick(menu.value)
                   : setChoice?.(menu.value);
               }
             }}

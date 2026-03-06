@@ -52,10 +52,18 @@ export const useSessionTerm = () => {
     const query = useQuery({
         queryKey: ['session'],
         queryFn: async () => {
-            const data = await SERVER.get('session/current')
-    
-            return data;
-        }
+            try {
+                const data = await SERVER.get('session/current')
+                return data;
+            } catch (error: any) {
+                // 404 means no current session - return null instead of throwing
+                if (error?.response?.status === 404) {
+                    return null;
+                }
+                throw error;
+            }
+        },
+        retry: false,
         })
         return query;
 }
@@ -111,5 +119,3 @@ export const useGetAllSubjects = () => {
       })
       return query;
 }
-
-

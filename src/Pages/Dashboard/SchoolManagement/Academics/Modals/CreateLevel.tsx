@@ -32,18 +32,18 @@ const CreateLevel = ({ openModal, closeModal, isEditing }) => {
 			dispatch(setClassLevel({levelName, levelShortName, armNames}));
 			dispatch(createClassLevel({levelName, levelShortName, armNames}));
 			if(res.data){
-				toast.success('Class level created successfully!', { toastOptions });
+				toast.success('Class level created successfully!', toastOptions);
 				return;
 			} else{
-				toast.error('Failed, please try again later!', { toastOptions });
+				toast.error('Failed, please try again later!', toastOptions);
 			}
 			closeModal()
 		} catch (error) {
 			if(error.response.status === 400){
-				toast.warn('Failed, Class Level already exist!', { toastOptions });
+				toast.warn('Failed, Class Level already exist!', toastOptions);
 				return;
 			} else {
-				toast.error('Failed, please try again later!', { toastOptions });
+				toast.error('Failed, please try again later!', toastOptions);
 				return;
 			}
 		}

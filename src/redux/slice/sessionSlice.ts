@@ -43,12 +43,12 @@ const sessionSlice = createSlice({
             .addCase(submitSession.fulfilled, (state, action) => {
                 state.status = 'succeeded'
                 state.session = action.payload;
-                toast.success('Session created successfully!', { toastOptions })
+                toast.success('Session created successfully!', toastOptions)
             })
             .addCase(submitSession.rejected, (state, action) => {
                 state.status = 'failed'
                 state.error = action.payload;
-                toast.error('Error creating session, Plases try again later', { toastOptions })
+                toast.error('Error creating session, Plases try again later', toastOptions)
             })
     
           }

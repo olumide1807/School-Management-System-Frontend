@@ -12,19 +12,19 @@ export const login = async (dispatch, user) => {
         const res = await axios.post(API_URL + '/superadmin/login', user)
 
         if(res.data){
-            toast.success('Login successfully!', { toastOptions })
+            toast.success('Login successfully!', toastOptions)
             const token = res.data.token
             sessionStorage.setItem('token', token)
             return dispatch(loginSuccess(token)) && window.location.replace('/');
         } else {
-            toast.error('Login Failed!', { toastOptions });
+            toast.error('Login Failed!', toastOptions);
             return;
         }
 
     } catch (error) {
         console.error(error);
         dispatch(loginFailure())
-        toast.error('Failed! Something went wrong', { toastOptions });
+        toast.error('Failed! Something went wrong', toastOptions);
         return;
     }
 }

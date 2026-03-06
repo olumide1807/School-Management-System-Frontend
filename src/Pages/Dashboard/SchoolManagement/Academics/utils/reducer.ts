@@ -10,6 +10,8 @@ export const sessionReducer = (state, action) => {
             const updatedTerms = [...state.term];
             updatedTerms[index][name] = value instanceof Date ? value.toISOString() : value;
             return { ...state, term: updatedTerms };
+        case 'RESET':
+            return action.payload;
         default:
             return state;
     }
