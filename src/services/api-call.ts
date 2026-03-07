@@ -97,7 +97,7 @@ export const useClassLevels = () => {
 
 export const useClassArms = () => {
   const query = useQuery({
-      queryKey: ['classes'],
+      queryKey: ['class-arms'],
       queryFn: async () => {
           const data = await SERVER.get('class/arm')
   

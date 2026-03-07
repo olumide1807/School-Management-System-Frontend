@@ -34,6 +34,7 @@ const CreateLevel = ({ openModal, closeModal, isEditing }: { openModal: boolean;
 			await dispatch(createClassLevel({ levelName, levelShortName, armNames })).unwrap();
 			// Refetch class data
 			queryClient.invalidateQueries({ queryKey: ['classes'] });
+			queryClient.invalidateQueries({ queryKey: ['class-arms'] });
 			methods.reset();
 			setInputs([{ value: '' }, { value: '' }]);
 			closeModal();
