@@ -53,7 +53,10 @@ const AdminDashboard = () => {
   
   const sessionName = session?.data?.data?.data?.session?.sessionName;
   const currTerm = session?.data?.data?.data?.term?.termName;
-  console.log(currTerm);
+  const sessionStatus = session?.data?.data?.data?.status;
+  const holidayType = session?.data?.data?.data?.holidayType;
+  const nextTerm = session?.data?.data?.data?.nextTerm;
+  const nextSession = session?.data?.data?.data?.nextSession;
   
   const { data: announcementData, refetch: refetchAnnouncements } = useGetAnnoucement();
   const announcements = announcementData?.data?.data;
@@ -86,28 +89,86 @@ const AdminDashboard = () => {
               Session:
             </p>
             <div className="flex flex-col gap-y-2.5 md:mt-0 mt-3">
-              { sessionName ? 
-              <div className="flex flex-col">
-                <p className="text-xl text-black">{sessionName}</p>
-                <strong className="text-xl text-black">{currTerm}</strong>
-              </div>:
-                 <p className="text-sm text-black">No session set</p>
-              }
-              <Button
-                color="tertiary"
-                variant="contained"
-                sx={{
-                  color: "white",
-                  borderRadius: "10px",
-                  textTransform: "capitalize",
-                }}
-                onClick={() => {
-                  dispatch(setSlide(3));
-                  navigate("/school-management/academics");
-                }}
-              >
-                Create session
-              </Button>
+              { sessionStatus === "active" ? (
+                <div className="flex flex-col">
+                  <p className="text-xl text-black">{sessionName}</p>
+                  <strong className="text-xl text-black">{currTerm}</strong>
+                </div>
+              ) : sessionStatus === "holiday" && holidayType === "between_terms" ? (
+                <div className="flex flex-col">
+                  <p className="text-xl text-black">{sessionName}</p>
+                  <div className="flex items-center gap-x-2">
+                    <span className="bg-yellow-400 text-black text-sm font-semibold px-3 py-1 rounded-full">Holiday</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Next: {nextTerm?.termName} starts {nextTerm?.startDate ? new Date(nextTerm.startDate).toLocaleDateString() : 'TBD'}
+                  </p>
+                </div>
+              ) : sessionStatus === "holiday" && holidayType === "between_sessions" ? (
+                <div className="flex flex-col">
+                  <p className="text-lg text-black">{sessionName} (Completed)</p>
+                  <div className="flex items-center gap-x-2">
+                    <span className="bg-yellow-400 text-black text-sm font-semibold px-3 py-1 rounded-full">Holiday</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Next: {nextSession?.sessionName} starts {nextSession?.term1StartDate ? new Date(nextSession.term1StartDate).toLocaleDateString() : 'TBD'}
+                  </p>
+                </div>
+              ) : sessionStatus === "holiday" && holidayType === "no_next_session" ? (
+                <div className="flex flex-col">
+                  <p className="text-lg text-black">{sessionName} (Completed)</p>
+                  <div className="flex items-center gap-x-2">
+                    <span className="bg-yellow-400 text-black text-sm font-semibold px-3 py-1 rounded-full">Holiday</span>
+                  </div>
+                  <p className="text-sm text-red-500 mt-1">No upcoming session set</p>
+                </div>
+              ) : sessionStatus === "holiday" && holidayType === "awaiting_session" ? (
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-x-2">
+                    <span className="bg-yellow-400 text-black text-sm font-semibold px-3 py-1 rounded-full">Holiday</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Next: {nextSession?.sessionName} starts {nextSession?.term1StartDate ? new Date(nextSession.term1StartDate).toLocaleDateString() : 'TBD'}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-black">No session set</p>
+              )}
+
+              {/* Show appropriate button based on state */}
+              {sessionStatus === "holiday" && holidayType === "no_next_session" ? (
+                <Button
+                  color="tertiary"
+                  variant="contained"
+                  sx={{
+                    color: "white",
+                    borderRadius: "10px",
+                    textTransform: "capitalize",
+                  }}
+                  onClick={() => {
+                    dispatch(setSlide(3));
+                    navigate("/school-management/academics");
+                  }}
+                >
+                  Create Next Session
+                </Button>
+              ) : (
+                <Button
+                  color="tertiary"
+                  variant="contained"
+                  sx={{
+                    color: "white",
+                    borderRadius: "10px",
+                    textTransform: "capitalize",
+                  }}
+                  onClick={() => {
+                    dispatch(setSlide(3));
+                    navigate("/school-management/academics");
+                  }}
+                >
+                  {sessionName || sessionStatus === "holiday" ? "View Session" : "Create Session"}
+                </Button>
+              )}
             </div>
           </div>
           <div className="flex my-2 gap-x-12 bg-bg-1 w-full md:w-fit md:p-0 p-3 rounded-[10px]">

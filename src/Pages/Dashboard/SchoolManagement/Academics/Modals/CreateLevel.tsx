@@ -4,48 +4,42 @@ import { Button } from "@mui/material";
 import Modal from "../../../../../Components/Modals";
 import ValidatedInput from "../../../../../Components/Forms/ValidatedInput";
 import { useDispatch, useSelector } from "react-redux";
-import { createClassLevel, setClassLevel } from "../../../../../redux/slice/classLevel";
+import { createClassLevel } from "../../../../../redux/slice/classLevel";
 import { ErrorMsg } from "../../../../../Components/Forms";
 import { useState } from "react";
-import { toast } from 'react-toastify';
-import { toastOptions } from "../../../../../Utils/toastOptions";
-import { Add }from '@mui/icons-material';
+import { Add } from '@mui/icons-material';
+import { useQueryClient } from "@tanstack/react-query";
 
 
 
-const CreateLevel = ({ openModal, closeModal, isEditing }) => {
+const CreateLevel = ({ openModal, closeModal, isEditing }: { openModal: boolean; closeModal: () => void; isEditing?: boolean }) => {
 	const methods = useForm({
 		mode: "all",
 	});
 
-	const dispatch = useDispatch();
-	const { error, status } = useSelector((state) => state.classLevel);
+	const dispatch = useDispatch<any>();
+	const queryClient = useQueryClient();
+	const { error, status } = useSelector((state: any) => state.classLevel);
 
 	const [inputs, setInputs] = useState([{ value: '' }, { value: '' }]);
 
-	const onSubmit = async (data) => {
+	const onSubmit = async (data: any) => {
+		const armNames = inputs
+			.map((_, index) => data[`armNames${index}`])
+			.filter(Boolean); // remove empty values
+
+		const { levelName, levelShortName } = data;
+
 		try {
-			let armNames = inputs.map((input, index) => data[`armNames${index}`]);
-	
-			armNames.push('armNames')
-			const { levelName, levelShortName } = data;
-			dispatch(setClassLevel({levelName, levelShortName, armNames}));
-			dispatch(createClassLevel({levelName, levelShortName, armNames}));
-			if(res.data){
-				toast.success('Class level created successfully!', toastOptions);
-				return;
-			} else{
-				toast.error('Failed, please try again later!', toastOptions);
-			}
-			closeModal()
-		} catch (error) {
-			if(error.response.status === 400){
-				toast.warn('Failed, Class Level already exist!', toastOptions);
-				return;
-			} else {
-				toast.error('Failed, please try again later!', toastOptions);
-				return;
-			}
+			await dispatch(createClassLevel({ levelName, levelShortName, armNames })).unwrap();
+			// Refetch class data
+			queryClient.invalidateQueries({ queryKey: ['classes'] });
+			methods.reset();
+			setInputs([{ value: '' }, { value: '' }]);
+			closeModal();
+		} catch (err) {
+			// Error toast is handled in the slice
+			console.error(err);
 		}
 	};
 
@@ -91,7 +85,7 @@ const CreateLevel = ({ openModal, closeModal, isEditing }) => {
 									<ValidatedInput
 										key={index}
 										name={`armNames${index}`}
-										label="Arm name"
+										label={`Arm name ${index + 1}`}
 										placeholder="e.g  A, B, Gold, Silver"
 										otherClass="border border-[#ABABAB] bg-[#F7F8F8] rounded-[10px]"
 									/>
@@ -111,6 +105,7 @@ const CreateLevel = ({ openModal, closeModal, isEditing }) => {
 							color="tertiary"
 							variant="contained"
 							type='submit'
+							disabled={status === 'pending'}
 							sx={{
 								color: "white",
 								borderRadius: "10px",
@@ -118,7 +113,7 @@ const CreateLevel = ({ openModal, closeModal, isEditing }) => {
 								padding: "12px 35px",
 								}}
 								>
-							{ status === 'pending' ? 'saving':
+							{ status === 'pending' ? 'Saving...':
 							isEditing ? "Save changes" : "Save"
 							}
 						</Button>

@@ -7,12 +7,14 @@ import LevelTemplate from "../Modals/LevelTemplate";
 import CreateLevel from "../Modals/CreateLevel";
 import AssignTeacherModal from "../Modals/AssignTeacherModal";
 import { useClassArms, useClassLevels } from "../../../../../services/api-call";
+import Loader from "../../../../loaders/Loader";
+import EmptyTable from "../../../../../Components/EmptyTable";
 
 
 
 export default function Classes() {
-  const [choiceArm, setChoiceArm] = useState("Select arm");
-  const [choiceLevel, setChoiceLevel] = useState("Select level");
+  const [choiceArm, setChoiceArm] = useState("All arms");
+  const [choiceLevel, setChoiceLevel] = useState("All levels");
   const [openLevelTemplateModal, setOpenLevelTemplateModal] = useState(false);
   const [openCreateLevelModal, setOpenCreateLevelModal] = useState(false);
   const [openAssignTeacherModal, setOpenAssignTeacherModal] = useState(false);
@@ -21,10 +23,55 @@ export default function Classes() {
   const navigate = useNavigate();
 
   const classes = useClassLevels();
-  const arms = useClassArms()
+  const arms = useClassArms();
 
-	const num =  classes?.data?.data?.data.length;
-  const armNumber = arms?.data?.data?.data?.length;
+  const classLevels = classes?.data?.data?.data || [];
+  const classArms = arms?.data?.data?.data || [];
+  const isLoading = classes?.isPending || arms?.isPending;
+
+  const num = classLevels.length;
+  const armNumber = classArms.length;
+
+  // Build filter options from actual data
+  const levelFilterOptions = [
+    { label: "All levels", value: "All levels" },
+    ...classLevels.map((cl: any) => ({
+      label: cl.levelShortName || cl.levelName,
+      value: cl.levelShortName || cl.levelName,
+    })),
+  ];
+
+  const armFilterOptions = [
+    { label: "All arms", value: "All arms" },
+    ...classArms.map((arm: any) => ({
+      label: arm.armName,
+      value: arm.armName,
+    })),
+  ];
+
+  // Build table data from real API data — combine levels with their arms
+  const tableData = classArms
+    .map((arm: any, i: number) => {
+      const level = classLevels.find((cl: any) => cl._id === arm.classLevelId);
+      return {
+        sn: i + 1,
+        name: `${level?.levelShortName || ''} ${arm.armName}`.trim(),
+        levelShortName: level?.levelShortName || '',
+        armName: arm.armName,
+        teacher: arm.assignedTeacher || "Not assigned",
+        subject: arm.totalSubjects || "0",
+        students: arm.totalStudents || "0",
+        actions: '',
+        id: arm._id,
+        _raw: arm,
+      };
+    })
+    .filter((row: any) => {
+      // Apply filters
+      const levelMatch = choiceLevel === "All levels" || row.levelShortName === choiceLevel;
+      const armMatch = choiceArm === "All arms" || row.armName === choiceArm;
+      return levelMatch && armMatch;
+    });
 
 
   const headcells = [
@@ -34,27 +81,27 @@ export default function Classes() {
     },
     {
       key: "name",
-      name: "Class Level",
+      name: "Class",
     },
     {
       key: "teacher",
-      name: "Class teacher",
+      name: "Class Teacher",
     },
     {
       key: "subject",
-      name: "Total subject",
+      name: "Total Subjects",
     },
     {
       key: "students",
-      name: "Total students",
+      name: "Total Students",
     },
     {
       key: "actions",
       name: [
         {
           name: "View class",
-          handleClick: () => {
-            navigate("view/:id");
+          handleClick: (row: any) => {
+            navigate(`view/${row.id}`);
           },
         },
         {
@@ -67,18 +114,6 @@ export default function Classes() {
     },
   ];
 
-
-  const tableData = Array(7)
-    .fill("")
-    .map((_, i) => ({
-      sn: i + 1,
-      name: "JSS 1A",
-      teacher: "Jacob Jones",
-      subject: "21",
-      students: "21",
-      actions: '',
-      id: `row_${i}`,
-    }));
 
   return (
     <div className="flex flex-col">
@@ -110,33 +145,44 @@ export default function Classes() {
           </Button>
         </div>
       </div>
-      <div className="flex items-center gap-x-5 mb-11">
 
-        <div className="flex items-center gap-x-2.5 w-full">
-          <FilterComponent
-            menuOptions={menuOptionsLevel}
-            choice={choiceLevel}
-            setChoice={setChoiceLevel}
-          />
-          <FilterComponent
-            menuOptions={menuOptionsArm}
-            choice={choiceArm}
-            setChoice={setChoiceArm}
-          />
-        </div>
-      </div>
-      <div>
+      {isLoading ? (
+        <Loader />
+      ) : classLevels.length === 0 ? (
+        <EmptyTable 
+          message='No Class Levels Created' 
+          text='Create Class Level' 
+          onClick={() => setOpenCreateLevelModal(true)}
+        />
+      ) : (
+        <>
+          <div className="flex items-center gap-x-5 mb-11">
+            <div className="flex items-center gap-x-2.5 w-full">
+              <FilterComponent
+                menuOptions={levelFilterOptions}
+                choice={choiceLevel}
+                setChoice={setChoiceLevel}
+              />
+              <FilterComponent
+                menuOptions={armFilterOptions}
+                choice={choiceArm}
+                setChoice={setChoiceArm}
+              />
+            </div>
+          </div>
+          <div>
+            <TableComponent
+              headcells={headcells}
+              tableData={tableData}
+              handleClick1={() => setOpenCreateLevelModal(true)}
+              handleClick2={() => setOpenCreateLevelModal(true)}
+              btn1Name="Create level with template"
+              btn2Name="Create class Level"
+            />
+          </div>
+        </>
+      )}
 
-      <TableComponent
-					headcells={headcells}
-					tableData={tableData}
-					handleClick1={() => setOpenCreateLevelModal(true)}
-					handleClick2={() => setOpenCreateLevelModal(true)}
-					btn1Name="Create level with template"
-					btn2Name="Create class Level"
-				/>
-
-      </div>
       <LevelTemplate
         openModal={openLevelTemplateModal}
         closeModal={() => setOpenLevelTemplateModal(false)}
@@ -154,33 +200,18 @@ export default function Classes() {
 }
 
 
-
+// Exported for use in other components (e.g. StudentManagement)
 export const menuOptionsLevel = [
-  {
-    label: "JSS1",
-    value: "JSS1",
-  },
-  {
-    label: "JSS2",
-    value: "JSS2",
-  },
-  {
-    label: "JSS3",
-    value: "JSS3",
-  },
+  { label: "JSS1", value: "JSS1" },
+  { label: "JSS2", value: "JSS2" },
+  { label: "JSS3", value: "JSS3" },
+  { label: "SS1", value: "SS1" },
+  { label: "SS2", value: "SS2" },
+  { label: "SS3", value: "SS3" },
 ];
 
 export const menuOptionsArm = [
-  {
-    label: "A",
-    value: "A",
-  },
-  {
-    label: "B",
-    value: "B",
-  },
-  {
-    label: "C",
-    value: "C",
-  },
+  { label: "A", value: "A" },
+  { label: "B", value: "B" },
+  { label: "C", value: "C" },
 ];

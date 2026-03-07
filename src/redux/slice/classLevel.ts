@@ -1,5 +1,7 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import SERVER from "../../Utils/server";
+import { toast } from "react-toastify";
+import { toastOptions } from "../../Utils/toastOptions";
 
 const initialState = {
     classLevel: null,
@@ -9,12 +11,12 @@ const initialState = {
 
 
 export const createClassLevel = createAsyncThunk('classLevel/createClassLevel',
-     async (data, {rejectedWithValue}) => {
+     async (data, { rejectWithValue }) => {
         try {
             const res = await SERVER.post('class', data);
             return res.data;
-        } catch (error) {
-            return rejectedWithValue(error.res.data);
+        } catch (error: any) {
+            return rejectWithValue(error?.response?.data || error);
         }
     }
 )
@@ -29,17 +31,21 @@ const classLevelSlice = createSlice({
         }
     },
 
-
     extraReducers: (builder) => {
         builder
             .addCase(createClassLevel.pending, (state) => {
                 state.status = 'pending';
             })
-            .addCase(createClassLevel.fulfilled, (state) => {
+            .addCase(createClassLevel.fulfilled, (state, action) => {
                 state.status = 'succeeded';
+                state.classLevel = action.payload;
+                toast.success('Class level created successfully!', toastOptions);
             })
-            .addCase(createClassLevel.rejected, (state) => {
+            .addCase(createClassLevel.rejected, (state, action: any) => {
                 state.status = 'failed';
+                state.error = true;
+                const errMsg = action.payload?.error || 'Failed to create class level';
+                toast.error(errMsg, toastOptions);
             })
     }
 })
