@@ -7,15 +7,14 @@ import SessionTerms from "./tabs/SessionTerms";
 import Subjects from "./tabs/Subjects";
 import Timetable from "./tabs/Timetable";
 import View from "./tabs/tab2/View";
-import ClassLevel from "./tabs/tab2/ClassLevel";
+import ViewClassLevel from "./tabs/tab2/ViewClassLevel";
 import { useDispatch, useSelector } from "react-redux";
 import { setSlide } from "../../../../redux/slice/academicSlides";
 
 export default function Academics() {
-  // const [presentStep, setPresentStep] = useState(1);
   const dispatch = useDispatch();
-  const presentStep = useSelector((state) => state.academicSlides.slideNo);
-  const stepComponents = {
+  const presentStep = useSelector((state: any) => state.academicSlides.slideNo);
+  const stepComponents: Record<number, JSX.Element> = {
     1: <Classes />,
     2: <Subjects />,
     3: <SessionTerms />,
@@ -24,10 +23,14 @@ export default function Academics() {
   };
 
   const [searchParams] = useSearchParams();
-  const isShowingView = searchParams.get("name") !== null;
-  const isShowingClassLevel = searchParams.get("level") !== null;
-  if (isShowingView) return <View />;
-  else if (isShowingClassLevel) return <ClassLevel />;
+  const hasArm = searchParams.get("arm") !== null;
+  const hasName = searchParams.get("name") !== null;
+  const nameParam = searchParams.get("name");
+  
+  // Arm detail view (e.g. ?arm=xxx&level=yyy&name=JSS1 A)
+  if (hasArm) return <ViewClassLevel />;
+  // View all levels page (e.g. ?name=view)
+  if (hasName && nameParam === "view") return <View />;
 
   return (
     <div>

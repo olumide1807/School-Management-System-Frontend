@@ -3,24 +3,35 @@ import { Button } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import FilterComponent from "../../../../../Components/FilterComponent";
 import TableComponent from "../../../../../Components/Tables";
-import LevelTemplate from "../Modals/LevelTemplate";
 import CreateLevel from "../Modals/CreateLevel";
-import AssignTeacherModal from "../Modals/AssignTeacherModal";
 import { useClassArms, useClassLevels } from "../../../../../services/api-call";
 import Loader from "../../../../loaders/Loader";
 import EmptyTable from "../../../../../Components/EmptyTable";
+import Modal from "../../../../../Components/Modals";
+import ValidatedInput from "../../../../../Components/Forms/ValidatedInput";
+import { useForm, FormProvider } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
+import SERVER from "../../../../../Utils/server";
+import { toast } from "react-toastify";
+import { toastOptions } from "../../../../../Utils/toastOptions";
+import MenuItem from "@mui/material/MenuItem";
+import Select from "@mui/material/Select";
+import FormControl from "@mui/material/FormControl";
+import InputLabel from "@mui/material/InputLabel";
 
 
 
 export default function Classes() {
   const [choiceArm, setChoiceArm] = useState("All arms");
   const [choiceLevel, setChoiceLevel] = useState("All levels");
-  const [openLevelTemplateModal, setOpenLevelTemplateModal] = useState(false);
   const [openCreateLevelModal, setOpenCreateLevelModal] = useState(false);
-  const [openAssignTeacherModal, setOpenAssignTeacherModal] = useState(false);
-
+  const [openAddArmModal, setOpenAddArmModal] = useState(false);
+  const [selectedLevelForArm, setSelectedLevelForArm] = useState<string>("");
+  const [addingArm, setAddingArm] = useState(false);
 
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const methods = useForm({ mode: "all" });
 
   const classes = useClassLevels();
   const arms = useClassArms();
@@ -43,31 +54,32 @@ export default function Classes() {
 
   const armFilterOptions = [
     { label: "All arms", value: "All arms" },
-    ...classArms.map((arm: any) => ({
-      label: arm.armName,
-      value: arm.armName,
+    ...[...new Set(classArms.map((arm: any) => arm.armName?.toUpperCase()))].map((name) => ({
+      label: name,
+      value: name,
     })),
   ];
 
-  // Build table data from real API data — combine levels with their arms
+  // Build table data from real API data
   const tableData = classArms
     .map((arm: any, i: number) => {
       const level = classLevels.find((cl: any) => cl._id === arm.classLevelId);
+      const armNameUpper = arm.armName?.toUpperCase() || '';
       return {
         sn: i + 1,
-        name: `${level?.levelShortName || ''} ${arm.armName}`.trim(),
+        name: `${level?.levelShortName || ''} ${armNameUpper}`.trim(),
         levelShortName: level?.levelShortName || '',
-        armName: arm.armName,
+        armName: armNameUpper,
         teacher: arm.assignedTeacher || "Not assigned",
         subject: arm.totalSubjects || "0",
         students: arm.totalStudents || "0",
         actions: '',
         id: arm._id,
+        levelId: arm.classLevelId,
         _raw: arm,
       };
     })
     .filter((row: any) => {
-      // Apply filters
       const levelMatch = choiceLevel === "All levels" || row.levelShortName === choiceLevel;
       const armMatch = choiceArm === "All arms" || row.armName === choiceArm;
       return levelMatch && armMatch;
@@ -101,18 +113,40 @@ export default function Classes() {
         {
           name: "View class",
           handleClick: (row: any) => {
-            navigate(`view/${row.id}`);
+            navigate(`/school-management/academics?arm=${row.id}&level=${row.levelId}&name=${row.name}`);
           },
         },
         {
-          name: "Assign teacher",
-          handleClick: () => {
-            setOpenAssignTeacherModal(true);
+          name: "Add arm to this level",
+          handleClick: (row: any) => {
+            setSelectedLevelForArm(row.levelId);
+            setOpenAddArmModal(true);
           },
         },
       ],
     },
   ];
+
+  const handleAddArm = async (data: any) => {
+    if (!data.armName?.trim() || !selectedLevelForArm) return;
+    setAddingArm(true);
+    try {
+      await SERVER.post(`class/${selectedLevelForArm}/arm`, { armName: data.armName.trim().toUpperCase() });
+      toast.success(`Arm "${data.armName.toUpperCase()}" added successfully!`, toastOptions);
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      queryClient.invalidateQueries({ queryKey: ['class-arms'] });
+      methods.reset();
+      setOpenAddArmModal(false);
+    } catch (error: any) {
+      const errMsg = error?.response?.data?.error || 'Failed to add arm';
+      toast.error(errMsg, toastOptions);
+    } finally {
+      setAddingArm(false);
+    }
+  };
+
+  // Get the level name for the add arm modal title
+  const selectedLevel = classLevels.find((cl: any) => cl._id === selectedLevelForArm);
 
 
   return (
@@ -128,22 +162,19 @@ export default function Classes() {
             <p className="text-sm">Class arm created</p>
           </div>
         </div>
-        <div className="flex items-center gap-x-[29px]">
-
-          <Button
-            color="tertiary"
-            variant="contained"
-            onClick={() => navigate('view')}
-            sx={{
-              color: "white",
-              borderRadius: "10px",
-              paddingY: "12px",
-              maxWidth: "221px",
-            }}
-            >
-            View
-          </Button>
-        </div>
+        <Button
+          color="tertiary"
+          variant="contained"
+          onClick={() => setOpenCreateLevelModal(true)}
+          sx={{
+            color: "white",
+            borderRadius: "10px",
+            paddingY: "12px",
+            paddingX: "20px",
+          }}
+        >
+          Create Class Level
+        </Button>
       </div>
 
       {isLoading ? (
@@ -175,26 +206,52 @@ export default function Classes() {
               headcells={headcells}
               tableData={tableData}
               handleClick1={() => setOpenCreateLevelModal(true)}
-              handleClick2={() => setOpenCreateLevelModal(true)}
-              btn1Name="Create level with template"
-              btn2Name="Create class Level"
+              btn1Name="Create class Level"
             />
           </div>
         </>
       )}
 
-      <LevelTemplate
-        openModal={openLevelTemplateModal}
-        closeModal={() => setOpenLevelTemplateModal(false)}
-      />
       <CreateLevel
         openModal={openCreateLevelModal}
         closeModal={() => setOpenCreateLevelModal(false)}
       />
-      <AssignTeacherModal
-        openModal={openAssignTeacherModal}
-        closeModal={() => setOpenAssignTeacherModal(false)}
-      />
+
+      {/* Add Arm Modal */}
+      <Modal
+        openModal={openAddArmModal}
+        closeModal={() => {
+          setOpenAddArmModal(false);
+          methods.reset();
+        }}
+        title={`Add Arm to ${selectedLevel?.levelShortName || selectedLevel?.levelName || 'Class Level'}`}
+      >
+        <FormProvider {...methods}>
+          <form onSubmit={methods.handleSubmit(handleAddArm)} className="flex flex-col gap-y-8">
+            <ValidatedInput
+              name="armName"
+              label="Arm name"
+              placeholder="e.g  C, D, Gold, Silver"
+              otherClass="border border-[#ABABAB] bg-[#F7F8F8] rounded-[10px]"
+            />
+            <Button
+              color="tertiary"
+              variant="contained"
+              type="submit"
+              disabled={addingArm}
+              sx={{
+                color: "white",
+                borderRadius: "10px",
+                textTransform: "capitalize",
+                padding: "12px 35px",
+                width: "fit-content",
+              }}
+            >
+              {addingArm ? 'Adding...' : 'Add Arm'}
+            </Button>
+          </form>
+        </FormProvider>
+      </Modal>
     </div>
   );
 }

@@ -6,9 +6,10 @@ import TableComponent from "../../../../../../Components/Tables";
 import DeleteClassLevelModal from "../../Modals/DeleteClassLevelModal";
 import LevelTemplate from "../../Modals/LevelTemplate";
 import CreateLevel from "../../Modals/CreateLevel";
-import { useClassLevels } from "../../../../../../services/api-call";
-
-
+import { useClassLevels, useClassArms } from "../../../../../../services/api-call";
+import Loader from "../../../../../loaders/Loader";
+import EmptyTable from "../../../../../../Components/EmptyTable";
+import moment from "moment";
 
 
 
@@ -18,15 +19,33 @@ const View = () => {
 	const [openLevelTemplateModal, setOpenLevelTemplateModal] = useState(false);
 	const [openCreateLevelModal, setOpenCreateLevelModal] = useState(false);
 	const [isEditing, setIsEditing] = useState(false);
+	const [selectedLevel, setSelectedLevel] = useState<any>(null);
 	const navigate = useNavigate();
 
 	const allClasses = useClassLevels();
+	const allArms = useClassArms();
 
-	const classes = allClasses?.data?.data?.data.map((classLevel, index) => ({
-		...classLevel,
-		__v: index + 1,
-	  }));
-  
+	const classLevels = allClasses?.data?.data?.data || [];
+	const classArms = allArms?.data?.data?.data || [];
+	const isLoading = allClasses?.isPending;
+
+	// Build table data with arm count and formatted date
+	const classes = classLevels.map((classLevel: any, index: number) => {
+		const armCount = classArms.filter((arm: any) => arm.classLevelId === classLevel._id).length;
+		return {
+			...classLevel,
+			__v: index + 1,
+			arms_no: armCount,
+			createdAt: classLevel.createdAt ? (() => {
+				const d = new Date(classLevel.createdAt);
+				const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+				const day = d.getDate();
+				const suffix = day === 1 || day === 21 || day === 31 ? 'st' : day === 2 || day === 22 ? 'nd' : day === 3 || day === 23 ? 'rd' : 'th';
+				return `${months[d.getMonth()]} ${day}${suffix} ${d.getFullYear()}`;
+			})() : '-',
+		};
+	});
+
 
 	const headcells = [
 		{
@@ -54,20 +73,14 @@ const View = () => {
 			name: [
 				{
 					name: "View class level",
-					handleClick: () => {
-						navigate(":id");
-					},
-				},
-				{
-					name: "Edit class level",
-					handleClick: () => {
-						setIsEditing(true);
-						setOpenCreateLevelModal(true);
+					handleClick: (row: any) => {
+						navigate(`/school-management/academics?level=${row._id}&name=${row.levelShortName}`);
 					},
 				},
 				{
 					name: "Delete class level",
-					handleClick: () => {
+					handleClick: (row: any) => {
+						setSelectedLevel(row);
 						setOpenDeleteClassLevel(true);
 					},
 				},
@@ -118,11 +131,20 @@ const View = () => {
 					</div>
 				</div>
 
-				<TableComponent 
-					headcells={headcells} 
-					tableData={classes} 
-
-				/>
+				{isLoading ? (
+					<Loader />
+				) : classes.length === 0 ? (
+					<EmptyTable
+						message="No Class Levels Created"
+						text="Create Class Level"
+						onClick={() => setOpenCreateLevelModal(true)}
+					/>
+				) : (
+					<TableComponent 
+						headcells={headcells} 
+						tableData={classes} 
+					/>
+				)}
 
 				<DeleteClassLevelModal
 					openModal={openDeleteClassLevel}
@@ -140,8 +162,5 @@ const View = () => {
 			</div>
 	);
 }
-
-
-
 
 export default View;

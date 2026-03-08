@@ -9,6 +9,8 @@ import { ErrorMsg } from "../../../../../Components/Forms";
 import { useState } from "react";
 import { Add } from '@mui/icons-material';
 import { useQueryClient } from "@tanstack/react-query";
+import { useClassLevels } from "../../../../../services/api-call";
+import { useNavigate } from "react-router-dom";
 
 
 
@@ -19,27 +21,49 @@ const CreateLevel = ({ openModal, closeModal, isEditing }: { openModal: boolean;
 
 	const dispatch = useDispatch<any>();
 	const queryClient = useQueryClient();
+	const navigate = useNavigate();
 	const { error, status } = useSelector((state: any) => state.classLevel);
 
 	const [inputs, setInputs] = useState([{ value: '' }, { value: '' }]);
+	const [levelExistsMsg, setLevelExistsMsg] = useState('');
+	const [existingLevelRef, setExistingLevelRef] = useState<any>(null);
+
+	// Get existing class levels to check for duplicates
+	const classLevelsQuery = useClassLevels();
+	const existingLevels = classLevelsQuery?.data?.data?.data || [];
 
 	const onSubmit = async (data: any) => {
 		const armNames = inputs
 			.map((_, index) => data[`armNames${index}`])
-			.filter(Boolean); // remove empty values
+			.filter(Boolean);
 
 		const { levelName, levelShortName } = data;
 
+		// Check if level already exists
+		const existingLevel = existingLevels.find(
+			(cl: any) => cl.levelName?.toLowerCase() === levelName?.toLowerCase() || 
+			             cl.levelShortName?.toLowerCase() === levelShortName?.toLowerCase()
+		);
+
+		if (existingLevel) {
+			setExistingLevelRef(existingLevel);
+			setLevelExistsMsg(
+				`"${existingLevel.levelShortName || existingLevel.levelName}" already exists. You can only create arms when creating a new level.`
+			);
+			return;
+		}
+
+		setLevelExistsMsg('');
+		setExistingLevelRef(null);
+
 		try {
 			await dispatch(createClassLevel({ levelName, levelShortName, armNames })).unwrap();
-			// Refetch class data
 			queryClient.invalidateQueries({ queryKey: ['classes'] });
 			queryClient.invalidateQueries({ queryKey: ['class-arms'] });
 			methods.reset();
 			setInputs([{ value: '' }, { value: '' }]);
 			closeModal();
 		} catch (err) {
-			// Error toast is handled in the slice
 			console.error(err);
 		}
 	};
@@ -48,12 +72,24 @@ const CreateLevel = ({ openModal, closeModal, isEditing }: { openModal: boolean;
 	const handleAddMore = () => {
 		setInputs([...inputs, { value: '' }]);
 	}
+
+	const handleGoToView = () => {
+		setLevelExistsMsg('');
+		closeModal();
+		if (existingLevelRef) {
+			navigate(`/school-management/academics?level=${existingLevelRef._id}&name=${existingLevelRef.levelShortName || existingLevelRef.levelName}`);
+		}
+	}
 	
 	return (
 		<>
 		<Modal
 			openModal={openModal}
-			closeModal={closeModal}
+			closeModal={() => {
+				setLevelExistsMsg('');
+				setExistingLevelRef(null);
+				closeModal();
+			}}
 			title={isEditing ? "Edit Class Level" : "Create Class Level"}
 		>
 			<FormProvider {...methods}>
@@ -75,59 +111,57 @@ const CreateLevel = ({ openModal, closeModal, isEditing }: { openModal: boolean;
 							otherClass="border border-[#ABABAB] bg-[#F7F8F8] rounded-[10px]"
 						/>
 					</div>
-					<div className="">
-						<p className="mb-10 font-semibold text-black text-xl">
-							Create Class Arm
-						</p>
-						<div className="flex flex-col gap-y-7">
 
-							{
-								inputs.map((input, index) => (
-									<ValidatedInput
-										key={index}
-										name={`armNames${index}`}
-										label={`Arm name ${index + 1}`}
-										placeholder="e.g  A, B, Gold, Silver"
-										otherClass="border border-[#ABABAB] bg-[#F7F8F8] rounded-[10px]"
-									/>
-								))
-							}
-
-
+					{levelExistsMsg && (
+						<div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+							<p className="text-yellow-800 text-sm">{levelExistsMsg}</p>
 						</div>
+					)}
 
-						<Button variant="outlined" style={{marginTop: '16px'}} startIcon={<Add/>} onClick={handleAddMore}>
-							Add more
-						</Button>
-							
-					</div>
-					<div className="">
-						<Button
-							color="tertiary"
-							variant="contained"
-							type='submit'
-							disabled={status === 'pending'}
-							sx={{
-								color: "white",
-								borderRadius: "10px",
-								textTransform: "capitalize",
-								padding: "12px 35px",
-								}}
+					{!levelExistsMsg && (
+						<>
+							<div>
+								<p className="mb-10 font-semibold text-black text-xl">
+									Create Class Arm
+								</p>
+								<div className="flex flex-col gap-y-7">
+									{inputs.map((input, index) => (
+										<ValidatedInput
+											key={index}
+											name={`armNames${index}`}
+											label={`Arm name ${index + 1}`}
+											placeholder="e.g  A, B, Gold, Silver"
+											otherClass="border border-[#ABABAB] bg-[#F7F8F8] rounded-[10px]"
+										/>
+									))}
+								</div>
+								<Button variant="outlined" style={{marginTop: '16px'}} startIcon={<Add/>} onClick={handleAddMore}>
+									Add more
+								</Button>
+							</div>
+							<div>
+								<Button
+									color="tertiary"
+									variant="contained"
+									type='submit'
+									disabled={status === 'pending'}
+									sx={{
+										color: "white",
+										borderRadius: "10px",
+										textTransform: "capitalize",
+										padding: "12px 35px",
+									}}
 								>
-							{ status === 'pending' ? 'Saving...':
-							isEditing ? "Save changes" : "Save"
-							}
-						</Button>
-
-						{error === true && <ErrorMsg text='An error occured'/>}
-					</div>
+									{status === 'pending' ? 'Saving...' : isEditing ? "Save changes" : "Save"}
+								</Button>
+								{error === true && status === 'failed' && <ErrorMsg text='An error occurred, please try again'/>}
+							</div>
+						</>
+					)}
 				</form>
 			</FormProvider>
 		</Modal>
-
 		</>
-
-
 	);
 }
 

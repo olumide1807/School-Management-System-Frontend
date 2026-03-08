@@ -35,9 +35,11 @@ const classLevelSlice = createSlice({
         builder
             .addCase(createClassLevel.pending, (state) => {
                 state.status = 'pending';
+                state.error = false;
             })
             .addCase(createClassLevel.fulfilled, (state, action) => {
                 state.status = 'succeeded';
+                state.error = false;
                 state.classLevel = action.payload;
                 toast.success('Class level created successfully!', toastOptions);
             })

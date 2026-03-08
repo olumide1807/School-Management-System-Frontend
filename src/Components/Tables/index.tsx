@@ -93,7 +93,7 @@ export default function TableComponent({
                     key={`-row_${rowIndex}-col_${colIndex}`}
                   >
                     {col.key === "createdAt"
-                      ? moment(row[col.key]).format("MMM Do YY")
+                      ? row[col.key]
                       : row[col.key]}
                     {col.key === "actions" && (
                       <DropDownWrapper
