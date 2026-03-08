@@ -8,6 +8,7 @@ import Subjects from "./tabs/Subjects";
 import Timetable from "./tabs/Timetable";
 import View from "./tabs/tab2/View";
 import ViewClassLevel from "./tabs/tab2/ViewClassLevel";
+import SubjectDetail from "./tabs/SubjectDetail";
 import { useDispatch, useSelector } from "react-redux";
 import { setSlide } from "../../../../redux/slice/academicSlides";
 
@@ -24,11 +25,14 @@ export default function Academics() {
 
   const [searchParams] = useSearchParams();
   const hasArm = searchParams.get("arm") !== null;
+  const hasSubject = searchParams.get("subject") !== null;
   const hasName = searchParams.get("name") !== null;
   const nameParam = searchParams.get("name");
   
   // Arm detail view (e.g. ?arm=xxx&level=yyy&name=JSS1 A)
   if (hasArm) return <ViewClassLevel />;
+  // Subject detail view (e.g. ?subject=xxx&subjectName=Mathematics)
+  if (hasSubject) return <SubjectDetail />;
   // View all levels page (e.g. ?name=view)
   if (hasName && nameParam === "view") return <View />;
 
