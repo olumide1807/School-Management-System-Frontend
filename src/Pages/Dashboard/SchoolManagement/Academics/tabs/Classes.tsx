@@ -116,13 +116,6 @@ export default function Classes() {
             navigate(`/school-management/academics?arm=${row.id}&level=${row.levelId}&name=${row.name}`);
           },
         },
-        {
-          name: "Add arm to this level",
-          handleClick: (row: any) => {
-            setSelectedLevelForArm(row.levelId);
-            setOpenAddArmModal(true);
-          },
-        },
       ],
     },
   ];
@@ -136,6 +129,7 @@ export default function Classes() {
       queryClient.invalidateQueries({ queryKey: ['classes'] });
       queryClient.invalidateQueries({ queryKey: ['class-arms'] });
       methods.reset();
+      setSelectedLevelForArm("");
       setOpenAddArmModal(false);
     } catch (error: any) {
       const errMsg = error?.response?.data?.error || 'Failed to add arm';
@@ -144,9 +138,6 @@ export default function Classes() {
       setAddingArm(false);
     }
   };
-
-  // Get the level name for the add arm modal title
-  const selectedLevel = classLevels.find((cl: any) => cl._id === selectedLevelForArm);
 
 
   return (
@@ -187,8 +178,8 @@ export default function Classes() {
         />
       ) : (
         <>
-          <div className="flex items-center gap-x-5 mb-11">
-            <div className="flex items-center gap-x-2.5 w-full">
+          <div className="flex items-center justify-between mb-11">
+            <div className="flex items-center gap-x-2.5">
               <FilterComponent
                 menuOptions={levelFilterOptions}
                 choice={choiceLevel}
@@ -200,6 +191,19 @@ export default function Classes() {
                 setChoice={setChoiceArm}
               />
             </div>
+            <Button
+              color="tertiary"
+              variant="outlined"
+              onClick={() => setOpenAddArmModal(true)}
+              sx={{
+                borderRadius: "10px",
+                paddingY: "10px",
+                paddingX: "20px",
+                textTransform: "capitalize",
+              }}
+            >
+              Add Class Arm
+            </Button>
           </div>
           <div>
             <TableComponent
@@ -222,23 +226,46 @@ export default function Classes() {
         openModal={openAddArmModal}
         closeModal={() => {
           setOpenAddArmModal(false);
+          setSelectedLevelForArm("");
           methods.reset();
         }}
-        title={`Add Arm to ${selectedLevel?.levelShortName || selectedLevel?.levelName || 'Class Level'}`}
+        title="Add Class Arm"
       >
         <FormProvider {...methods}>
           <form onSubmit={methods.handleSubmit(handleAddArm)} className="flex flex-col gap-y-8">
+            <FormControl fullWidth>
+              <InputLabel id="select-level-label">Select Class Level</InputLabel>
+              <Select
+                labelId="select-level-label"
+                value={selectedLevelForArm}
+                label="Select Class Level"
+                onChange={(e) => setSelectedLevelForArm(e.target.value)}
+                required
+                sx={{
+                  borderRadius: "10px",
+                  backgroundColor: "#F7F8F8",
+                }}
+              >
+                {classLevels.map((cl: any) => (
+                  <MenuItem key={cl._id} value={cl._id}>
+                    {cl.levelShortName || cl.levelName}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
             <ValidatedInput
               name="armName"
               label="Arm name"
               placeholder="e.g  C, D, Gold, Silver"
               otherClass="border border-[#ABABAB] bg-[#F7F8F8] rounded-[10px]"
             />
+
             <Button
               color="tertiary"
               variant="contained"
               type="submit"
-              disabled={addingArm}
+              disabled={addingArm || !selectedLevelForArm}
               sx={{
                 color: "white",
                 borderRadius: "10px",
