@@ -3,6 +3,7 @@ import { useState } from "react";
 import UserInfo from "./UserInfo";
 import MessageModal from "../../Components/Modals/MessageModal";
 import EditUserProfile from "./Modals/EditUserProfile";
+import TimetableSettings from "./TimetableSettings";
 
 export default function Settings() {
   const [readProfileOnly1, setReadProfileOnly1] = useState(true);
@@ -26,6 +27,8 @@ export default function Settings() {
         setReadProfileOnly2={setReadProfileOnly2}
       ></UserInfo>
       <UserCurrentPlan />
+
+      <TimetableSettings />
 
       {/* Delete Account */}
       <Button

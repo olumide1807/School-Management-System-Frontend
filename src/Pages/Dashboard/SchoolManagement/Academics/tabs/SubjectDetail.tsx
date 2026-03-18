@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Button } from "@mui/material";
+import { Button, Checkbox, FormControlLabel } from "@mui/material";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import FormControl from "@mui/material/FormControl";
@@ -23,12 +23,12 @@ const SubjectDetail = () => {
 
     const queryClient = useQueryClient();
 
-    const [openAddToClass, setOpenAddToClass] = useState(false);
+    const [openManageClasses, setOpenManageClasses] = useState(false);
     const [openAssignTeacher, setOpenAssignTeacher] = useState(false);
-    const [selectedArmId, setSelectedArmId] = useState("");
-    const [selectedTeacherId, setSelectedTeacherId] = useState("");
     const [selectedSpecific, setSelectedSpecific] = useState<any>(null);
+    const [selectedTeacherId, setSelectedTeacherId] = useState("");
     const [saving, setSaving] = useState(false);
+    const [checkedArmIds, setCheckedArmIds] = useState<string[]>([]);
 
     const allArms = useClassArms();
     const allLevels = useClassLevels();
@@ -57,6 +57,12 @@ const SubjectDetail = () => {
 
     const specifics = specificsData?.data || [];
     const staff = staffData?.data || [];
+    const assignedArmIds = specifics.map((sp: any) => sp.classArmId);
+
+    // Sync checkedArmIds when specifics load or modal opens
+    useEffect(() => {
+        setCheckedArmIds(assignedArmIds);
+    }, [specificsData]);
 
     // Helper to get class arm label
     const getArmLabel = (classArmId: string) => {
@@ -72,6 +78,9 @@ const SubjectDetail = () => {
         const teacher = staff.find((s: any) => s._id === teacherId);
         return teacher ? `${teacher.firstName || ''} ${teacher.surname || teacher.lastName || ''}`.trim() : 'Not assigned';
     };
+
+    // Build class list for display under header
+    const assignedClassLabels = assignedArmIds.map((id: string) => getArmLabel(id)).filter(Boolean);
 
     // Build table data
     const headcells = [
@@ -89,24 +98,45 @@ const SubjectDetail = () => {
         _raw: sp,
     }));
 
-    // Filter out class arms that already have this subject
-    const assignedArmIds = specifics.map((sp: any) => sp.classArmId);
-    const availableArms = classArms.filter((arm: any) => !assignedArmIds.includes(arm._id));
+    // Toggle arm in checkedArmIds
+    const handleToggleArm = (armId: string) => {
+        setCheckedArmIds(prev =>
+            prev.includes(armId) ? prev.filter(id => id !== armId) : [...prev, armId]
+        );
+    };
 
-    const handleAddToClass = async () => {
-        if (!selectedArmId) return;
+    const handleSaveClassAssignments = async () => {
         setSaving(true);
+        const decodedName = subjectName ? decodeURIComponent(subjectName) : '';
         try {
-            await SERVER.post(`subject/${selectedArmId}`, {
-                subjectName: subjectName,
-            });
-            toast.success('Subject added to class!', toastOptions);
+            // Find arms to ADD (checked but not currently assigned)
+            const toAdd = checkedArmIds.filter(id => !assignedArmIds.includes(id));
+            // Find arms to REMOVE (currently assigned but unchecked)
+            const toRemove = assignedArmIds.filter((id: string) => !checkedArmIds.includes(id));
+
+            // Add new assignments
+            for (const armId of toAdd) {
+                await SERVER.post(`subject/${armId}`, { subjectName: decodedName });
+            }
+
+            // Remove unselected assignments
+            for (const armId of toRemove) {
+                const specific = specifics.find((sp: any) => sp.classArmId === armId);
+                if (specific) {
+                    await SERVER.delete(`subject/${specific._id}?find=specificSubject`);
+                }
+            }
+
+            if (toAdd.length > 0 || toRemove.length > 0) {
+                toast.success('Class assignments updated!', toastOptions);
+            }
+
             queryClient.invalidateQueries({ queryKey: ['subject-specifics', subjectId] });
             queryClient.invalidateQueries({ queryKey: ['all-specific-subjects'] });
-            setSelectedArmId("");
-            setOpenAddToClass(false);
+            queryClient.invalidateQueries({ queryKey: ['arm-subject-counts'] });
+            setOpenManageClasses(false);
         } catch (error: any) {
-            const errMsg = error?.response?.data?.error || 'Failed to add subject to class';
+            const errMsg = error?.response?.data?.error || 'Failed to update class assignments';
             toast.error(errMsg, toastOptions);
         } finally {
             setSaving(false);
@@ -147,27 +177,39 @@ const SubjectDetail = () => {
                 </Link>
             </div>
 
-            <div className="flex items-center justify-between p-9 bg-bg-1 rounded-[10px] mb-6">
-                <div>
-                    <h2 className="text-2xl font-semibold text-black">{subjectName}</h2>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Offered in {specifics.length} class{specifics.length !== 1 ? 'es' : ''}
-                    </p>
+            <div className="flex flex-col gap-3 p-9 bg-bg-1 rounded-[10px] mb-6">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-semibold text-black">{subjectName ? decodeURIComponent(subjectName) : ''}</h2>
+                    <Button
+                        color="tertiary"
+                        variant="contained"
+                        onClick={() => {
+                            setCheckedArmIds(assignedArmIds);
+                            setOpenManageClasses(true);
+                        }}
+                        sx={{
+                            color: "white",
+                            borderRadius: "10px",
+                            paddingY: "10px",
+                            paddingX: "20px",
+                            textTransform: "capitalize",
+                        }}
+                    >
+                        Add / Remove Class(es)
+                    </Button>
                 </div>
-                <Button
-                    color="tertiary"
-                    variant="contained"
-                    onClick={() => setOpenAddToClass(true)}
-                    disabled={availableArms.length === 0}
-                    sx={{
-                        color: "white",
-                        borderRadius: "10px",
-                        paddingY: "12px",
-                        paddingX: "20px",
-                    }}
-                >
-                    Add to Class
-                </Button>
+                <div className="flex flex-wrap gap-2 items-center">
+                    <span className="text-sm text-gray-600">Classes offering this subject:</span>
+                    {assignedClassLabels.length === 0 ? (
+                        <span className="text-sm text-gray-400">None</span>
+                    ) : (
+                        assignedClassLabels.map((label: string, i: number) => (
+                            <span key={i} className="bg-white border border-gray-300 rounded-full px-3 py-1 text-xs font-medium">
+                                {label}
+                            </span>
+                        ))
+                    )}
+                </div>
             </div>
 
             <p className="text-sm text-gray-500 mb-2">Click on a row to assign/change the teacher</p>
@@ -178,7 +220,10 @@ const SubjectDetail = () => {
                 <EmptyTable
                     message="Not assigned to any class yet"
                     text="Add to Class"
-                    onClick={() => setOpenAddToClass(true)}
+                    onClick={() => {
+                        setCheckedArmIds([]);
+                        setOpenManageClasses(true);
+                    }}
                 />
             ) : (
                 <BasicTable
@@ -189,56 +234,47 @@ const SubjectDetail = () => {
                 />
             )}
 
-            {/* Add to Class Modal */}
+            {/* Manage Classes Modal */}
             <Modal
-                openModal={openAddToClass}
-                closeModal={() => {
-                    setOpenAddToClass(false);
-                    setSelectedArmId("");
-                }}
-                title={`Add "${subjectName}" to a Class`}
+                openModal={openManageClasses}
+                closeModal={() => setOpenManageClasses(false)}
+                title={`Manage Classes — ${subjectName ? decodeURIComponent(subjectName) : ''}`}
             >
-                <div className="flex flex-col gap-y-8">
-                    {availableArms.length === 0 ? (
-                        <p className="text-gray-500">All classes already have this subject.</p>
-                    ) : (
-                        <>
-                            <FormControl fullWidth>
-                                <InputLabel id="select-arm-label">Select Class</InputLabel>
-                                <Select
-                                    labelId="select-arm-label"
-                                    value={selectedArmId}
-                                    label="Select Class"
-                                    onChange={(e) => setSelectedArmId(e.target.value)}
-                                    sx={{ borderRadius: "10px", backgroundColor: "#F7F8F8" }}
-                                >
-                                    {availableArms.map((arm: any) => {
-                                        const level = classLevels.find((l: any) => l._id === arm.classLevelId);
-                                        const label = `${level?.levelShortName || ''} ${arm.armName?.toUpperCase()}`.trim();
-                                        return (
-                                            <MenuItem key={arm._id} value={arm._id}>
-                                                {label}
-                                            </MenuItem>
-                                        );
-                                    })}
-                                </Select>
-                            </FormControl>
-                            <Button
-                                color="tertiary"
-                                variant="contained"
-                                onClick={handleAddToClass}
-                                disabled={saving || !selectedArmId}
-                                sx={{
-                                    color: "white",
-                                    borderRadius: "10px",
-                                    paddingY: "12px",
-                                    width: "fit-content",
-                                }}
-                            >
-                                {saving ? "Adding..." : "Add to Class"}
-                            </Button>
-                        </>
-                    )}
+                <div className="flex flex-col gap-y-6">
+                    <p className="text-sm text-gray-600">Check the classes that should offer this subject. Uncheck to remove.</p>
+                    <div className="flex flex-col gap-1 max-h-[350px] overflow-y-auto border border-gray-200 rounded-lg p-3">
+                        {classArms.map((arm: any) => {
+                            const level = classLevels.find((l: any) => l._id === arm.classLevelId);
+                            const label = `${level?.levelShortName || ''} ${arm.armName?.toUpperCase() || ''}`.trim();
+                            const isChecked = checkedArmIds.includes(arm._id);
+                            return (
+                                <FormControlLabel
+                                    key={arm._id}
+                                    control={
+                                        <Checkbox
+                                            checked={isChecked}
+                                            onChange={() => handleToggleArm(arm._id)}
+                                        />
+                                    }
+                                    label={<span className="text-sm">{label}</span>}
+                                />
+                            );
+                        })}
+                    </div>
+                    <Button
+                        color="tertiary"
+                        variant="contained"
+                        onClick={handleSaveClassAssignments}
+                        disabled={saving}
+                        sx={{
+                            color: "white",
+                            borderRadius: "10px",
+                            paddingY: "12px",
+                            width: "fit-content",
+                        }}
+                    >
+                        {saving ? "Saving..." : "Save Changes"}
+                    </Button>
                 </div>
             </Modal>
 
@@ -250,7 +286,7 @@ const SubjectDetail = () => {
                     setSelectedSpecific(null);
                     setSelectedTeacherId("");
                 }}
-                title={`Assign Teacher — ${subjectName} (${selectedSpecific ? getArmLabel(selectedSpecific.classArmId) : ''})`}
+                title={`Assign Teacher — ${subjectName ? decodeURIComponent(subjectName) : ''} (${selectedSpecific ? getArmLabel(selectedSpecific.classArmId) : ''})`}
             >
                 <div className="flex flex-col gap-y-8">
                     {staff.length === 0 ? (

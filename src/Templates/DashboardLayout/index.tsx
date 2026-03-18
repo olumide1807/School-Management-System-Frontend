@@ -30,6 +30,30 @@ export default function DashboardLayout() {
 
   const dispatch = useDispatch();
 
+  // Auto-set page title from URL if not already set
+  useEffect(() => {
+    const pathMap: Record<string, string> = {
+      '/school-management/academics': 'Academics',
+      '/school-management/admission': 'Admission',
+      '/school-management/attendance': 'Attendance',
+      '/school-management/fee-management': 'Fee Management',
+      '/school-management/inventory': 'Inventory',
+      '/staff-management': 'Staff Management',
+      '/student-management': 'Student Management',
+      '/settings': 'Settings',
+      '/support': 'Support',
+      '/': 'Dashboard',
+    };
+    const matchedTitle = Object.entries(pathMap).find(([path]) => 
+      location.pathname.startsWith(path) && path !== '/'
+    );
+    if (matchedTitle) {
+      setPageTitle(matchedTitle[1]);
+    } else if (location.pathname === '/') {
+      setPageTitle('Dashboard');
+    }
+  }, [location.pathname]);
+
   const handleLogout = () => {
     dispatch(logout());
     sessionStorage.removeItem("token");

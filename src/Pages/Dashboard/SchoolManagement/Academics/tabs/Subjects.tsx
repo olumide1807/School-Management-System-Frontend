@@ -123,6 +123,7 @@ const Subjects = () => {
 			toast.success('Subject created successfully!', toastOptions);
 			queryClient.invalidateQueries({ queryKey: ['all-subjects'] });
 			queryClient.invalidateQueries({ queryKey: ['all-specific-subjects'] });
+			queryClient.invalidateQueries({ queryKey: ['arm-subject-counts'] });
 			methods.reset();
 			setSelectedClassArmIds([]);
 			setOpenAddSubject(false);
@@ -141,6 +142,7 @@ const Subjects = () => {
 			toast.success('Subject deleted successfully!', toastOptions);
 			queryClient.invalidateQueries({ queryKey: ['all-subjects'] });
 			queryClient.invalidateQueries({ queryKey: ['all-specific-subjects'] });
+			queryClient.invalidateQueries({ queryKey: ['arm-subject-counts'] });
 			setOpenDeleteSubject(false);
 			setSubjectToDelete(null);
 		} catch (error: any) {

@@ -5,13 +5,13 @@ import FilterComponent from "../../../../../Components/FilterComponent";
 import TableComponent from "../../../../../Components/Tables";
 import CreateLevel from "../Modals/CreateLevel";
 import { useClassArms, useClassLevels } from "../../../../../services/api-call";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import SERVER from "../../../../../Utils/server";
 import Loader from "../../../../loaders/Loader";
 import EmptyTable from "../../../../../Components/EmptyTable";
 import Modal from "../../../../../Components/Modals";
 import ValidatedInput from "../../../../../Components/Forms/ValidatedInput";
 import { useForm, FormProvider } from "react-hook-form";
-import { useQueryClient } from "@tanstack/react-query";
-import SERVER from "../../../../../Utils/server";
 import { toast } from "react-toastify";
 import { toastOptions } from "../../../../../Utils/toastOptions";
 import MenuItem from "@mui/material/MenuItem";
@@ -43,6 +43,28 @@ export default function Classes() {
   const num = classLevels.length;
   const armNumber = classArms.length;
 
+  // Fetch subject counts per arm
+  const { data: subjectCountsData } = useQuery({
+    queryKey: ['arm-subject-counts', classArms.map((a: any) => a._id).join(',')],
+    queryFn: async () => {
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        classArms.map(async (arm: any) => {
+          try {
+            const res = await SERVER.get(`subject/all/${arm._id}`);
+            counts[arm._id] = res?.data?.data?.length || 0;
+          } catch {
+            counts[arm._id] = 0;
+          }
+        })
+      );
+      return counts;
+    },
+    enabled: classArms.length > 0,
+  });
+
+  const subjectCounts = subjectCountsData || {};
+
   // Build filter options from actual data
   const levelFilterOptions = [
     { label: "All levels", value: "All levels" },
@@ -71,7 +93,7 @@ export default function Classes() {
         levelShortName: level?.levelShortName || '',
         armName: armNameUpper,
         teacher: arm.assignedTeacher || "Not assigned",
-        subject: arm.totalSubjects || "0",
+        subject: subjectCounts[arm._id] ?? "0",
         students: arm.totalStudents || "0",
         actions: '',
         id: arm._id,
