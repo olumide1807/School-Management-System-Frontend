@@ -14,6 +14,8 @@ import Button1 from "./Button";
 import MessageModal from "../../../Components/Modals/MessageModal";
 import { deleteAcctDetails, getSchDetails } from '../../../redux/slice/schoolDetail';
 import { CircularProgress } from "@mui/material";
+import SERVER from "../../../Utils/server";
+import { useQuery } from "@tanstack/react-query";
 
 
 
@@ -58,8 +60,76 @@ const AdminDashboard = () => {
   const nextTerm = session?.data?.data?.data?.nextTerm;
   const nextSession = session?.data?.data?.data?.nextSession;
   
-  const { data: announcementData, refetch: refetchAnnouncements } = useGetAnnoucement();
+  const { data: announcementData } = useGetAnnoucement();
   const announcements = announcementData?.data?.data;
+
+  // Fetch real counts for dashboard stats
+  const { data: studentsData } = useQuery({
+    queryKey: ['all-students'],
+    queryFn: async () => { const res = await SERVER.get('student'); return res?.data; },
+    retry: false,
+  });
+  const { data: parentsData } = useQuery({
+    queryKey: ['all-parents'],
+    queryFn: async () => { const res = await SERVER.get('parent'); return res?.data; },
+    retry: false,
+  });
+  const { data: staffData } = useQuery({
+    queryKey: ['all-staff'],
+    queryFn: async () => { const res = await SERVER.get('staff'); return res?.data; },
+    retry: false,
+  });
+
+  const allStudents = studentsData?.data || [];
+  const allParents = parentsData?.data || [];
+  const allStaff = staffData?.data || [];
+
+  const linkedStudents = allStudents.filter((s: any) => s.guardians?.length > 0);
+  const unlinkedStudents = allStudents.filter((s: any) => !s.guardians || s.guardians.length === 0);
+  const linkedParents = allParents.filter((p: any) => p.isLinked === true);
+  const unlinkedParents = allParents.filter((p: any) => !p.isLinked);
+  const academicStaff = allStaff.filter((s: any) => s.role === 'academic' || s.staffType === 'academic');
+  const nonAcademicStaff = allStaff.filter((s: any) => s.role !== 'academic' && s.staffType !== 'academic');
+
+  const dashboardStats = [
+    {
+      icon: <AdminIcon />,
+      value: "1",
+      desc: "Total number of admins",
+      bg: "",
+      items: [],
+    },
+    {
+      icon: <StaffIcon />,
+      value: String(allStaff.length),
+      desc: "Total number of staffs",
+      bg: "bg-[#E9FAFF]",
+      items: [
+        { value: String(academicStaff.length), desc: "Academic Staff" },
+        { value: String(nonAcademicStaff.length), desc: "Non Academic Staff" },
+      ],
+    },
+    {
+      icon: <ParentsIcon />,
+      value: String(allParents.length),
+      desc: "Total number of parents/guardians",
+      bg: "bg-[#E9E9FF]",
+      items: [
+        { value: String(linkedParents.length), desc: "Linked parent/guardian" },
+        { value: String(unlinkedParents.length), desc: "Non-Linked parent/guardian" },
+      ],
+    },
+    {
+      icon: <StudentsIcon />,
+      value: String(allStudents.length),
+      desc: "Total number of students",
+      bg: "bg-[#E9FFF4]",
+      items: [
+        { value: String(linkedStudents.length), desc: "Linked Student" },
+        { value: String(unlinkedStudents.length), desc: "Non-Linked Student" },
+      ],
+    },
+  ];
 
   const { status, details, error } = useSelector((state) => state.schoolDetails);
 
@@ -69,12 +139,11 @@ const AdminDashboard = () => {
 
 
   const deleteSchoolDetails = async () => {
-      await dispatch(deleteAcctDetails(details));
-      dispatch(getSchDetails());
+      dispatch(deleteAcctDetails(details));
   }
 
   const EditAcctDetails = () => {
-    setEditDetails(details?.data);
+    setEditDetails(acctDetails);
     setOpenSchAcctModal(true);
   }
 
@@ -135,7 +204,6 @@ const AdminDashboard = () => {
                 <p className="text-sm text-black">No session set</p>
               )}
 
-              {/* Show appropriate button based on state */}
               {sessionStatus === "holiday" && holidayType === "no_next_session" ? (
                 <Button
                   color="tertiary"
@@ -232,7 +300,7 @@ const AdminDashboard = () => {
           </div>
         </div>
         <div className="flex justify-between overflow-x-auto w-full horizontal-scroll">
-          {stats.map((stat, i) => (
+          {dashboardStats.map((stat, i) => (
             <StatCard key={i} {...stat} />
           ))}
         </div>
@@ -265,19 +333,13 @@ const AdminDashboard = () => {
 
       <CreateOrEditAnnouncement
         openModal={openCreateModal}
-        closeModal={() => {
-          setOpenCreateModal(false);
-          refetchAnnouncements();
-        }}
+        closeModal={() => setOpenCreateModal(false)}
         isEditing={isEditing}
-        announcement={null}
+        setIsEditing={setIsEditing}
       />
       <SchoolAccModal
         openModal={openSchAcctModal}
-        closeModal={() => {
-          setOpenSchAcctModal(false);
-          setEditDetails(null);
-        }}
+        closeModal={() => setOpenSchAcctModal(false)}
         editDetails={editDetails}
       />
      

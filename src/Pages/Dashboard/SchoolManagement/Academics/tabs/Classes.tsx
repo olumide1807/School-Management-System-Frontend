@@ -63,7 +63,29 @@ export default function Classes() {
     enabled: classArms.length > 0,
   });
 
+  // Fetch student counts per arm
+  const { data: studentCountsData } = useQuery({
+    queryKey: ['arm-student-counts', classArms.map((a: any) => a._id).join(',')],
+    queryFn: async () => {
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        classArms.map(async (arm: any) => {
+          try {
+            const res = await SERVER.get(`student/class/${arm._id}`);
+            const data = res?.data?.data;
+            counts[arm._id] = Array.isArray(data) ? data.length : 0;
+          } catch {
+            counts[arm._id] = 0;
+          }
+        })
+      );
+      return counts;
+    },
+    enabled: classArms.length > 0,
+  });
+
   const subjectCounts = subjectCountsData || {};
+  const studentCounts = studentCountsData || {};
 
   // Build filter options from actual data
   const levelFilterOptions = [
@@ -94,11 +116,10 @@ export default function Classes() {
         armName: armNameUpper,
         teacher: arm.assignedTeacher || "Not assigned",
         subject: subjectCounts[arm._id] ?? "0",
-        students: arm.totalStudents || "0",
+        students: studentCounts[arm._id] ?? "0",
         actions: '',
         id: arm._id,
         levelId: arm.classLevelId,
-        _raw: arm,
       };
     })
     .filter((row: any) => {
@@ -109,26 +130,11 @@ export default function Classes() {
 
 
   const headcells = [
-    {
-      key: "sn",
-      name: "S/N",
-    },
-    {
-      key: "name",
-      name: "Class",
-    },
-    {
-      key: "teacher",
-      name: "Class Teacher",
-    },
-    {
-      key: "subject",
-      name: "Total Subjects",
-    },
-    {
-      key: "students",
-      name: "Total Students",
-    },
+    { key: "sn", name: "S/N" },
+    { key: "name", name: "Class" },
+    { key: "teacher", name: "Class Teacher" },
+    { key: "subject", name: "Total Subjects" },
+    { key: "students", name: "Total Students" },
     {
       key: "actions",
       name: [
@@ -179,12 +185,7 @@ export default function Classes() {
           color="tertiary"
           variant="contained"
           onClick={() => setOpenCreateLevelModal(true)}
-          sx={{
-            color: "white",
-            borderRadius: "10px",
-            paddingY: "12px",
-            paddingX: "20px",
-          }}
+          sx={{ color: "white", borderRadius: "10px", paddingY: "12px", paddingX: "20px" }}
         >
           Create Class Level
         </Button>
@@ -217,12 +218,7 @@ export default function Classes() {
               color="tertiary"
               variant="outlined"
               onClick={() => setOpenAddArmModal(true)}
-              sx={{
-                borderRadius: "10px",
-                paddingY: "10px",
-                paddingX: "20px",
-                textTransform: "capitalize",
-              }}
+              sx={{ borderRadius: "10px", paddingY: "10px", paddingX: "20px", textTransform: "capitalize" }}
             >
               Add Class Arm
             </Button>
@@ -246,11 +242,7 @@ export default function Classes() {
       {/* Add Arm Modal */}
       <Modal
         openModal={openAddArmModal}
-        closeModal={() => {
-          setOpenAddArmModal(false);
-          setSelectedLevelForArm("");
-          methods.reset();
-        }}
+        closeModal={() => { setOpenAddArmModal(false); setSelectedLevelForArm(""); methods.reset(); }}
         title="Add Class Arm"
       >
         <FormProvider {...methods}>
@@ -263,10 +255,7 @@ export default function Classes() {
                 label="Select Class Level"
                 onChange={(e) => setSelectedLevelForArm(e.target.value)}
                 required
-                sx={{
-                  borderRadius: "10px",
-                  backgroundColor: "#F7F8F8",
-                }}
+                sx={{ borderRadius: "10px", backgroundColor: "#F7F8F8" }}
               >
                 {classLevels.map((cl: any) => (
                   <MenuItem key={cl._id} value={cl._id}>
@@ -275,26 +264,18 @@ export default function Classes() {
                 ))}
               </Select>
             </FormControl>
-
             <ValidatedInput
               name="armName"
               label="Arm name"
               placeholder="e.g  C, D, Gold, Silver"
               otherClass="border border-[#ABABAB] bg-[#F7F8F8] rounded-[10px]"
             />
-
             <Button
               color="tertiary"
               variant="contained"
               type="submit"
               disabled={addingArm || !selectedLevelForArm}
-              sx={{
-                color: "white",
-                borderRadius: "10px",
-                textTransform: "capitalize",
-                padding: "12px 35px",
-                width: "fit-content",
-              }}
+              sx={{ color: "white", borderRadius: "10px", textTransform: "capitalize", padding: "12px 35px", width: "fit-content" }}
             >
               {addingArm ? 'Adding...' : 'Add Arm'}
             </Button>

@@ -94,6 +94,8 @@ export default function TableComponent({
                   >
                     {col.key === "createdAt"
                       ? row[col.key]
+                      : col.key === "actions"
+                      ? null
                       : row[col.key]}
                     {col.key === "actions" && (
                       <DropDownWrapper
@@ -108,7 +110,8 @@ export default function TableComponent({
                           rowIndex === tableData?.length - 1 ? "top" : "bottom"
                         }
                       >
-                        {headcells
+                        {Array.isArray(headcells.find((cell) => cell.key === "actions")?.name) &&
+                          headcells
                           .find((cell) => cell.key === "actions")
                           ?.name.map((action: Action, i: number) => (
                             <Button
@@ -128,8 +131,7 @@ export default function TableComponent({
           </TableBody>
         </Table>
       </TableContainer>
-      {tableData?.length <= 0 ||
-        (!tableData && (
+      {(tableData?.length <= 0 || !tableData) && (
           <EmptyData
             handleClick1={handleClick1}
             handleClick2={handleClick2}
@@ -137,7 +139,7 @@ export default function TableComponent({
             btn2Name={btn2Name}
             message={message}
           />
-        ))}
+        )}
     </>
   );
 }
