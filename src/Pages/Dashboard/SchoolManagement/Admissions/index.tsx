@@ -10,7 +10,7 @@ import MessageModal from "../../../../Components/Modals/MessageModal";
 import Modal from "../../../../Components/Modals";
 import SERVER from "../../../../Utils/server";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useClassArms, useClassLevels } from "../../../../services/api-call";
+import { useClassArms, useClassLevels, useSessionTerm } from "../../../../services/api-call";
 import { toast } from "react-toastify";
 import { toastOptions } from "../../../../Utils/toastOptions";
 
@@ -72,8 +72,37 @@ function StudentProfileView() {
   });
 
   const students = studentsData?.data || [];
-  const allParents = parentsData?.data || [];
-  const student = students.find((s: any) => s._id === studentId);
+    const allParents = parentsData?.data || [];
+    const student = students.find((s: any) => s._id === studentId);
+ 
+    // Fetch all fees for the Fees tab
+    const { data: feesData } = useQuery({
+      queryKey: ['all-fees'],
+      queryFn: async () => { const res = await SERVER.get('fee'); return res?.data; },
+      retry: false,
+    });
+ 
+    // Fetch payment history for this student
+    const { data: paymentsData } = useQuery({
+      queryKey: ['student-payments', studentId],
+      queryFn: async () => { const res = await SERVER.get(`payment/student/${studentId}`); return res?.data; },
+      enabled: !!studentId,
+      retry: false,
+    });
+ 
+    // Fetch current session and its terms (for mapping termId to name)
+    const sessionInfo = useSessionTerm();
+    const currentSessionForFees = sessionInfo?.data?.data?.data?.session;
+ 
+    const { data: termsData } = useQuery({
+      queryKey: ['session-terms', currentSessionForFees?._id],
+      queryFn: async () => {
+        const res = await SERVER.get(`session/term/${currentSessionForFees._id}`);
+        return res?.data?.data || [];
+      },
+      enabled: !!currentSessionForFees?._id,
+      retry: false,
+    });
 
   const getParentName = (parentId: string) => {
     const parent = allParents.find((p: any) => p._id === parentId);
@@ -245,10 +274,11 @@ function StudentProfileView() {
   }
 
   const profileSteps = [
-    { id: 1, name: "Personal Bio Data" },
-    { id: 2, name: "Parent/Guardian" },
-    { id: 3, name: "Attendance" },
-  ];
+      { id: 1, name: "Personal Bio Data" },
+      { id: 2, name: "Parent/Guardian" },
+      { id: 3, name: "Fees" },
+      { id: 4, name: "Attendance" },
+    ];
 
   return (
     <>
@@ -434,8 +464,159 @@ function StudentProfileView() {
           </div>
         )}
 
-        {/* Tab 3: Attendance */}
-        {presentStep === 3 && (
+        {/* Tab 3: Fees */}
+        {presentStep === 3 && (() => {
+          const allFees = feesData?.data || [];
+          const allPayments = paymentsData?.data || [];
+          const allTerms = termsData || [];
+ 
+          // Fees for this student's class arm
+          const studentFees = allFees.filter((f: any) => f.classArmId === student.classArmId);
+ 
+          // Sort by term start date (newest first)
+          const sortedFees = [...studentFees].sort((a: any, b: any) => {
+            const termA = allTerms.find((t: any) => t._id === a.termId);
+            const termB = allTerms.find((t: any) => t._id === b.termId);
+            const dateA = termA?.termStartDate ? new Date(termA.termStartDate).getTime() : 0;
+            const dateB = termB?.termStartDate ? new Date(termB.termStartDate).getTime() : 0;
+            return dateB - dateA;
+          });
+ 
+          const getTermName = (termId: string) =>
+            allTerms.find((t: any) => t._id === termId)?.termName || '-';
+ 
+          const getTotalFee = (fee: any) =>
+            fee.fees?.reduce((s: number, f: any) => s + (parseFloat(f.amount) || 0), 0) || 0;
+ 
+          const getTotalPaid = (feeId: string) =>
+            allPayments
+              .filter((p: any) => p.feeId === feeId)
+              .reduce((s: number, p: any) => s + (p.amount || 0), 0);
+ 
+          const totalOwed = sortedFees.reduce((s: number, f: any) => s + getTotalFee(f), 0);
+          const totalPaid = allPayments.reduce((s: number, p: any) => s + (p.amount || 0), 0);
+          const totalBalance = totalOwed - totalPaid;
+ 
+          return (
+            <div className="flex flex-col gap-5">
+              {/* Summary cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 mb-1">Total Fees</p>
+                  <p className="text-lg font-bold text-black">₦{totalOwed.toLocaleString()}</p>
+                </div>
+                <div className="border border-gray-200 rounded-xl p-4 bg-green-50">
+                  <p className="text-xs text-gray-500 mb-1">Total Paid</p>
+                  <p className="text-lg font-bold text-green-700">₦{totalPaid.toLocaleString()}</p>
+                </div>
+                <div className={`border border-gray-200 rounded-xl p-4 ${totalBalance > 0 ? 'bg-red-50' : 'bg-gray-50'}`}>
+                  <p className="text-xs text-gray-500 mb-1">Outstanding Balance</p>
+                  <p className={`text-lg font-bold ${totalBalance > 0 ? 'text-red-700' : 'text-gray-700'}`}>
+                    ₦{totalBalance.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+ 
+              {/* Fees by term */}
+              <div className="border border-gray-200 rounded-xl p-5">
+                <h3 className="font-semibold text-lg mb-4 text-black">Fees by Term</h3>
+                {sortedFees.length === 0 ? (
+                  <p className="text-gray-400 text-center py-8">No fees set for this class yet.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-[#E9FAFF] text-left">
+                          <th className="p-3 font-semibold">Term</th>
+                          <th className="p-3 font-semibold text-right">Amount</th>
+                          <th className="p-3 font-semibold text-right">Paid</th>
+                          <th className="p-3 font-semibold text-right">Balance</th>
+                          <th className="p-3 font-semibold text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedFees.map((fee: any) => {
+                          const total = getTotalFee(fee);
+                          const paid = getTotalPaid(fee._id);
+                          const balance = total - paid;
+                          const status = paid >= total ? 'Paid' : paid > 0 ? 'Partial' : 'Unpaid';
+                          return (
+                            <tr key={fee._id} className="border-t border-gray-100">
+                              <td className="p-3">{getTermName(fee.termId)}</td>
+                              <td className="p-3 text-right">₦{total.toLocaleString()}</td>
+                              <td className="p-3 text-right">₦{paid.toLocaleString()}</td>
+                              <td className="p-3 text-right">
+                                {balance > 0 ? `₦${balance.toLocaleString()}` : '-'}
+                              </td>
+                              <td className="p-3 text-center">
+                                <span className={`px-3 py-1 rounded text-xs font-medium ${
+                                  status === 'Paid' ? 'bg-green-100 text-green-700' :
+                                  status === 'Partial' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-red-100 text-red-700'
+                                }`}>
+                                  {status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+ 
+              {/* Payment history */}
+              <div className="border border-gray-200 rounded-xl p-5">
+                <h3 className="font-semibold text-lg mb-4 text-black">Payment History</h3>
+                {allPayments.length === 0 ? (
+                  <p className="text-gray-400 text-center py-8">No payments recorded yet.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 text-left">
+                          <th className="p-3 font-semibold">Date</th>
+                          <th className="p-3 font-semibold">Term</th>
+                          <th className="p-3 font-semibold">Method</th>
+                          <th className="p-3 font-semibold">Reference</th>
+                          <th className="p-3 font-semibold text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...allPayments]
+                          .sort((a: any, b: any) =>
+                            new Date(b.paymentDate || b.createdAt).getTime() -
+                            new Date(a.paymentDate || a.createdAt).getTime()
+                          )
+                          .map((p: any) => {
+                            const fee = allFees.find((f: any) => f._id === p.feeId);
+                            return (
+                              <tr key={p._id} className="border-t border-gray-100">
+                                <td className="p-3">
+                                  {new Date(p.paymentDate || p.createdAt).toLocaleDateString()}
+                                </td>
+                                <td className="p-3">{fee ? getTermName(fee.termId) : '-'}</td>
+                                <td className="p-3 capitalize">{p.paymentMethod || '-'}</td>
+                                <td className="p-3">{p.reference || '-'}</td>
+                                <td className="p-3 text-right font-medium">
+                                  ₦{parseFloat(p.amount).toLocaleString()}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+ 
+        {/* Tab 4: Attendance */}
+        {presentStep === 4 && (
           <div className="border border-gray-200 rounded-xl p-5">
             <h3 className="font-semibold text-lg mb-4 text-black">Attendance</h3>
             <div className="text-center py-10">

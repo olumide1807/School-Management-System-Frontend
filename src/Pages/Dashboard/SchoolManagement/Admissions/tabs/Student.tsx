@@ -17,7 +17,7 @@ import ValidatedInput from "../../../../../Components/Forms/ValidatedInput";
 import { useForm, FormProvider } from "react-hook-form";
 import SERVER from "../../../../../Utils/server";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useClassArms, useClassLevels } from "../../../../../services/api-call";
+import { useClassArms, useClassLevels, useSessionTerm } from "../../../../../services/api-call";
 import { toast } from "react-toastify";
 import { toastOptions } from "../../../../../Utils/toastOptions";
 import Loader from "../../../../loaders/Loader";
@@ -74,13 +74,123 @@ export default function Student() {
   });
 
   const allParents = parentsData?.data || [];
-
-  const students = studentsData?.data || [];
-  const totalStudents = students.length;
-  const activeStudents = students.filter((s: any) => s.status === "active").length;
-  const deactivatedStudents = students.filter((s: any) => s.status === "deactivated").length;
-  const maleStudents = students.filter((s: any) => s.gender === "male").length;
-  const femaleStudents = students.filter((s: any) => s.gender === "female").length;
+ 
+    const students = studentsData?.data || [];
+    const totalStudents = students.length;
+    const activeStudents = students.filter((s: any) => s.status === "active").length;
+    const deactivatedStudents = students.filter((s: any) => s.status === "deactivated").length;
+    const maleStudents = students.filter((s: any) => s.gender === "male").length;
+    const femaleStudents = students.filter((s: any) => s.gender === "female").length;
+ 
+    // ===== FEE STATUS SETUP =====
+    // Get current session and active term
+    const sessionInfo = useSessionTerm();
+    const activeSession = sessionInfo?.data?.data?.data?.session;
+    const activeTerm = sessionInfo?.data?.data?.data?.term;
+ 
+    // Fetch all terms in the current session (for finding a reference term when on holiday)
+    const { data: termsData } = useQuery({
+      queryKey: ['session-terms', activeSession?._id],
+      queryFn: async () => {
+        const res = await SERVER.get(`session/term/${activeSession._id}`);
+        return res?.data?.data || [];
+      },
+      enabled: !!activeSession?._id,
+      retry: false,
+    });
+    const terms = termsData || [];
+ 
+    // Determine the "reference term" for fee status:
+    // If a term is active, use that. Otherwise, use most recently started term.
+    const referenceTerm = (() => {
+      if (activeTerm?._id) return activeTerm;
+ 
+      const now = new Date();
+      const parseDate = (d: any) => d ? new Date(d) : null;
+      const endOfDay = (d: Date) => { const e = new Date(d); e.setHours(23, 59, 59, 999); return e; };
+      const startOfDay = (d: Date) => { const s = new Date(d); s.setHours(0, 0, 0, 0); return s; };
+ 
+      // Priority 2: term where today falls between start and end
+      const current = terms.find((t: any) => {
+        const s = parseDate(t.termStartDate);
+        const e = parseDate(t.termEndDate);
+        return s && e && startOfDay(s) <= now && now <= endOfDay(e);
+      });
+      if (current) return current;
+ 
+      // Priority 3: next upcoming term (earliest future start date)
+      const upcoming = [...terms]
+        .filter((t: any) => {
+          const s = parseDate(t.termStartDate);
+          return s && s > now;
+        })
+        .sort((a: any, b: any) =>
+          new Date(a.termStartDate).getTime() - new Date(b.termStartDate).getTime()
+        );
+      if (upcoming.length > 0) return upcoming[0];
+ 
+      // Priority 4: most recently completed term
+      const completed = [...terms]
+        .filter((t: any) => {
+          const e = parseDate(t.termEndDate);
+          return e && endOfDay(e) < now;
+        })
+        .sort((a: any, b: any) =>
+          new Date(b.termEndDate).getTime() - new Date(a.termEndDate).getTime()
+        );
+      return completed[0] || null;
+    })();
+ 
+    // Fetch all fees
+    const { data: feesData } = useQuery({
+      queryKey: ['all-fees'],
+      queryFn: async () => { const res = await SERVER.get('fee'); return res?.data; },
+      retry: false,
+    });
+    const allFees = feesData?.data || [];
+ 
+    // Fetch all payments (we'll filter per student in the table)
+    // Note: we hit the "get by student" endpoint for each student via React Query below
+    // A better approach would be a "get all school payments" endpoint — can add later
+    const { data: allPaymentsData } = useQuery({
+      queryKey: ['all-school-payments', activeSession?._id],
+      queryFn: async () => {
+        // Gather all payments for each fee in the reference term
+        if (!referenceTerm?._id) return [];
+        const feesInTerm = allFees.filter((f: any) => f.termId === referenceTerm._id);
+        const results = await Promise.all(
+          feesInTerm.map((fee: any) =>
+            SERVER.get(`payment/fee/${fee._id}`).then(r => r?.data?.data || []).catch(() => [])
+          )
+        );
+        return results.flat();
+      },
+      enabled: !!referenceTerm?._id && allFees.length > 0,
+      retry: false,
+    });
+    const allPayments = allPaymentsData || [];
+ 
+    // Helper: compute fee status for a given student
+    const getStudentFeeStatus = (student: any) => {
+      if (!referenceTerm?._id) return { label: 'N/A', color: 'gray' };
+ 
+      // Find the fee for this student's class in the reference term
+      const fee = allFees.find(
+        (f: any) => f.classArmId === student.classArmId && f.termId === referenceTerm._id
+      );
+      if (!fee) return { label: 'No fee', color: 'gray' };
+ 
+      const totalOwed = fee.fees?.reduce(
+        (s: number, f: any) => s + (parseFloat(f.amount) || 0), 0
+      ) || 0;
+      const paid = allPayments
+        .filter((p: any) => p.studentId === student._id && p.feeId === fee._id)
+        .reduce((s: number, p: any) => s + (p.amount || 0), 0);
+ 
+      if (paid >= totalOwed) return { label: 'Paid', color: 'green' };
+      if (paid > 0) return { label: 'Partial', color: 'yellow' };
+      return { label: 'Unpaid', color: 'red' };
+    };
 
   const getArmLabel = (classArmId: string) => {
     const arm = classArms.find((a: any) => a._id === classArmId);
@@ -101,33 +211,48 @@ export default function Student() {
       return name.includes(searchTerm.toLowerCase()) || s.studentID?.toLowerCase().includes(searchTerm.toLowerCase());
     });
 
-  const tableData = filteredStudents.map((student: any, i: number) => ({
-    sn: i + 1,
-    student: (
-      <div className="flex gap-x-3 items-center">
-        <Avatar sx={{ width: 36, height: 36 }} src={student.photo || ""} alt={student.firstName?.[0]} />
-        <div className="flex flex-col">
-          <p className="text-sm font-medium">{student.firstName} {student.surName}</p>
-          <p className="text-xs text-gray-500">{student.studentID}</p>
+  const tableData = filteredStudents.map((student: any, i: number) => {
+    const feeStatus = getStudentFeeStatus(student);
+    const feeStatusColors: Record<string, string> = {
+      green: 'bg-green-100 text-green-700',
+      yellow: 'bg-yellow-100 text-yellow-700',
+      red: 'bg-red-100 text-red-700',
+      gray: 'bg-gray-100 text-gray-600',
+    };
+    return {
+      sn: i + 1,
+      student: (
+        <div className="flex gap-x-3 items-center">
+          <Avatar sx={{ width: 36, height: 36 }} src={student.photo || ""} alt={student.firstName?.[0]} />
+          <div className="flex flex-col">
+            <p className="text-sm font-medium">{student.firstName} {student.surName}</p>
+            <p className="text-xs text-gray-500">{student.studentID}</p>
+          </div>
         </div>
-      </div>
-    ),
-    gender: student.gender === "male" ? "M" : "F",
-    level: getArmLabel(student.classArmId),
-    status: (
-      <span className={`px-3 py-1 rounded text-xs font-medium ${student.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-        {student.status}
-      </span>
-    ),
-    actions: '',
-    id: student._id,
-  }));
+      ),
+      gender: student.gender === "male" ? "M" : "F",
+      level: getArmLabel(student.classArmId),
+      feeStatus: (
+        <span className={`px-3 py-1 rounded text-xs font-medium ${feeStatusColors[feeStatus.color]}`}>
+          {feeStatus.label}
+        </span>
+      ),
+      status: (
+        <span className={`px-3 py-1 rounded text-xs font-medium ${student.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+          {student.status}
+        </span>
+      ),
+      actions: '',
+      id: student._id,
+    };
+  });
 
   const headcells = [
     { key: "sn", name: "S/N" },
     { key: "student", name: "Student" },
     { key: "gender", name: "Gender" },
     { key: "level", name: "Class" },
+    { key: "feeStatus", name: "Fee Status" },
     { key: "status", name: "Status" },
     {
       key: "actions",

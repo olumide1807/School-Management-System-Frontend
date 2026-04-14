@@ -60,9 +60,32 @@ export default function FeeManagement() {
   });
   const terms = termsData || [];
 
-  // Auto-select current term, or most relevant term if on holiday
+  // Auto-select term with smart priority:
+  //   1. Active term (if school is currently in session)
+  //   2. Term where today falls between start/end (defensive — in case scheduler lagged)
+  //   3. Next upcoming term (most practical for setting fees ahead)
+  //   4. Most recently completed term (for viewing past records)
+  //   5. First term in the list (fallback)
   useEffect(() => {
     if (terms.length > 0 && !filterTermId) {
+      const parseDate = (d: any) => {
+        if (!d) return null;
+        const date = new Date(d);
+        return isNaN(date.getTime()) ? null : date;
+      };
+      const endOfDay = (d: Date) => {
+        const e = new Date(d);
+        e.setHours(23, 59, 59, 999);
+        return e;
+      };
+      const startOfDay = (d: Date) => {
+        const s = new Date(d);
+        s.setHours(0, 0, 0, 0);
+        return s;
+      };
+
+      const now = new Date();
+
       // Priority 1: use active term from session if available
       if (activeTerm?._id) {
         setFilterTermId(activeTerm._id);
@@ -70,18 +93,11 @@ export default function FeeManagement() {
         return;
       }
 
-      const parseDate = (d: any) => {
-        if (!d) return null;
-        const date = new Date(d);
-        return isNaN(date.getTime()) ? null : date;
-      };
-
-      // Priority 2: find the term where today falls between start and end
-      const now = new Date();
+      // Priority 2: find the term where today falls between start and end (inclusive)
       const currentByDate = terms.find((t: any) => {
         const s = parseDate(t.termStartDate);
         const e = parseDate(t.termEndDate);
-        return s && e && s <= now && e >= now;
+        return s && e && startOfDay(s) <= now && now <= endOfDay(e);
       });
       if (currentByDate) {
         setFilterTermId(currentByDate._id);
@@ -89,20 +105,37 @@ export default function FeeManagement() {
         return;
       }
 
-      // Priority 3: find the most recently started term (today > start date)
-      const startedTerms = terms
+      // Priority 3: find the NEXT upcoming term (start date is in the future)
+      const upcomingTerms = terms
         .filter((t: any) => {
           const s = parseDate(t.termStartDate);
-          return s && s <= now;
+          return s && s > now;
         })
         .sort((a: any, b: any) => {
           const sa = parseDate(a.termStartDate)?.getTime() || 0;
           const sb = parseDate(b.termStartDate)?.getTime() || 0;
-          return sb - sa;
+          return sa - sb; // earliest future term first
         });
-      if (startedTerms.length > 0) {
-        setFilterTermId(startedTerms[0]._id);
-        if (!selectedTermId) setSelectedTermId(startedTerms[0]._id);
+      if (upcomingTerms.length > 0) {
+        setFilterTermId(upcomingTerms[0]._id);
+        if (!selectedTermId) setSelectedTermId(upcomingTerms[0]._id);
+        return;
+      }
+
+      // Priority 4: most recently completed term (for viewing historical records)
+      const completedTerms = terms
+        .filter((t: any) => {
+          const e = parseDate(t.termEndDate);
+          return e && endOfDay(e) < now;
+        })
+        .sort((a: any, b: any) => {
+          const ea = parseDate(a.termEndDate)?.getTime() || 0;
+          const eb = parseDate(b.termEndDate)?.getTime() || 0;
+          return eb - ea; // most recently completed first
+        });
+      if (completedTerms.length > 0) {
+        setFilterTermId(completedTerms[0]._id);
+        if (!selectedTermId) setSelectedTermId(completedTerms[0]._id);
         return;
       }
 
@@ -126,13 +159,32 @@ export default function FeeManagement() {
   });
   const allStudents = studentsData?.data || [];
 
+  // Get all fee IDs for the level (one per arm). We need payments for all of them.
+  const levelFeeIds = selectedFee
+    ? fees
+        .filter((f: any) => f.termId === selectedFee.termId)
+        .filter((f: any) => {
+          const levelArms = selectedFee._levelArms || [classArms.find((a: any) => a._id === selectedFee.classArmId)].filter(Boolean);
+          return levelArms.some((a: any) => a._id === f.classArmId);
+        })
+        .map((f: any) => f._id)
+    : [];
+ 
   const { data: paymentsData } = useQuery({
-    queryKey: ['fee-payments', selectedFee?._id],
-    queryFn: async () => { const res = await SERVER.get(`payment/fee/${selectedFee._id}`); return res?.data; },
-    enabled: !!selectedFee?._id,
+    queryKey: ['fee-payments-level', levelFeeIds.join(',')],
+    queryFn: async () => {
+      if (levelFeeIds.length === 0) return [];
+      const results = await Promise.all(
+        levelFeeIds.map((id: string) =>
+          SERVER.get(`payment/fee/${id}`).then(r => r?.data?.data || []).catch(() => [])
+        )
+      );
+      return results.flat();
+    },
+    enabled: levelFeeIds.length > 0,
     retry: false,
   });
-  const payments = paymentsData?.data || [];
+  const payments = Array.isArray(paymentsData) ? paymentsData : (paymentsData?.data || []);
 
   const getArmLabel = (id: string) => {
     const arm = classArms.find((a: any) => a._id === id);
@@ -151,10 +203,8 @@ export default function FeeManagement() {
   // Build table rows — one per class LEVEL (not arm)
   const tableData = classLevels.map((level: any, i: number) => {
     const levelArms = classArms.filter((a: any) => a.classLevelId === level._id);
-    // Find fees for all arms in this level
     const levelFees = filteredFees.filter((f: any) => levelArms.some((a: any) => a._id === f.classArmId));
     const firstFee = levelFees[0];
-    // Set if at least one arm has a fee (we treat levels as units)
     const hasFee = levelFees.length > 0;
     return {
       sn: i + 1,
@@ -188,14 +238,15 @@ export default function FeeManagement() {
           name: "View Fee Breakdown",
           handleClick: (row: any) => {
             if (!row._isSet) { toast.error("Fee not set for this level yet", toastOptions); return; }
-            setSelectedFee(row._fee); setOpenView(true);
+            // Store the selected fee AND the level info so the modal can show all arms
+            setSelectedFee({ ...row._fee, _levelId: row._levelId, _levelArms: row._levelArms });
+            setOpenView(true);
           },
         },
         {
           name: "Edit Fee Breakdown",
           handleClick: (row: any) => {
             if (!row._isSet) {
-              // For "Not set" levels, open create form with level pre-selected
               setSelectedLevelId(row._levelId);
               setSelectedArmIds(row._levelArms.map((a: any) => a._id));
               setOpenCreate(true);
@@ -238,6 +289,9 @@ export default function FeeManagement() {
       });
       toast.success('Fee breakdown saved!', toastOptions);
       queryClient.invalidateQueries({ queryKey: ['all-fees'] });
+      // Switch the table filter to the term we just saved for,
+      // so the newly created fee stays visible in the table
+      setFilterTermId(selectedTermId);
       resetCreate();
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to save', toastOptions);
@@ -258,20 +312,29 @@ export default function FeeManagement() {
     if (!paymentStudentId || !paymentAmount || !selectedFee) {
       toast.error("Select student and amount", toastOptions); return;
     }
+    const student = allStudents.find((s: any) => s._id === paymentStudentId);
+    if (!student) {
+      toast.error("Student not found", toastOptions); return;
+    }
+    // Use the fee record that matches THIS student's arm (not whatever selectedFee happens to be)
+    const studentFee = getFeeForStudent(student);
+    if (!studentFee) {
+      toast.error("No fee found for this student's class arm", toastOptions); return;
+    }
     setRecordingPayment(true);
     try {
       const res = await SERVER.post('payment', {
         studentId: paymentStudentId,
-        feeId: selectedFee._id,
+        feeId: studentFee._id,
         amount: paymentAmount,
         paymentMethod,
         reference: paymentRef
       });
       const newPayment = res?.data?.data;
-      const student = allStudents.find((s: any) => s._id === paymentStudentId);
-      setLastPayment({ ...newPayment, student, fee: selectedFee });
+      setLastPayment({ ...newPayment, student, fee: studentFee });
       toast.success('Payment recorded!', toastOptions);
-      queryClient.invalidateQueries({ queryKey: ['fee-payments', selectedFee._id] });
+      queryClient.invalidateQueries({ queryKey: ['fee-payments-level'] });
+      queryClient.invalidateQueries({ queryKey: ['all-fees'] });
       setPaymentStudentId(""); setPaymentAmount(""); setPaymentRef("");
       setOpenRecordPayment(false);
       setOpenReceipt(true);
@@ -321,7 +384,21 @@ export default function FeeManagement() {
     setFeeItems([{ description: "", amount: "" }]);
   };
 
-  const feeStudents = selectedFee ? allStudents.filter((s: any) => s.classArmId === selectedFee.classArmId) : [];
+  // Students for this fee's LEVEL (all arms of the level, not just one arm)
+  const selectedLevelArms = selectedFee?._levelArms || (selectedFee ? [classArms.find((a: any) => a._id === selectedFee.classArmId)].filter(Boolean) : []);
+  const selectedArmIdsInLevel = selectedLevelArms.map((a: any) => a._id);
+  const feeStudents = selectedFee
+    ? allStudents.filter((s: any) => selectedArmIdsInLevel.includes(s.classArmId))
+    : [];
+ 
+  // Helper: find the fee record for a student's specific arm (in the same term)
+  const getFeeForStudent = (student: any) => {
+    if (!selectedFee) return null;
+    return fees.find((f: any) =>
+      f.classArmId === student.classArmId && f.termId === selectedFee.termId
+    );
+  };
+
   const totalFeeAmt = selectedFee ? getTotalFee(selectedFee) : 0;
   const allFeeItems = [PLATFORM_FEE, ...feeItems];
   const previewTotal = allFeeItems.reduce((s, f) => s + (parseFloat(f.amount) || 0), 0);
@@ -379,7 +456,6 @@ export default function FeeManagement() {
               onChange={(e) => {
                 const levelId = e.target.value;
                 setSelectedLevelId(levelId);
-                // Auto-select ALL arms of this level
                 const armsOfLevel = classArms.filter((a: any) => a.classLevelId === levelId);
                 setSelectedArmIds(armsOfLevel.map((a: any) => a._id));
               }}
@@ -471,13 +547,20 @@ export default function FeeManagement() {
 
       {/* === VIEW FEE === */}
       <Modal openModal={openView} closeModal={() => { setOpenView(false); setSelectedFee(null); }}
-        title={selectedFee ? `${getArmLabel(selectedFee.classArmId)} Fee Breakdown` : "Fee Breakdown"} maxWidth="750px">
+        title={(() => {
+          if (!selectedFee) return "Fee Breakdown";
+          const level = classLevels.find((l: any) => l._id === selectedFee._levelId);
+          if (level) return `${level.levelShortName || level.levelName} Fee Breakdown`;
+          return `${getArmLabel(selectedFee.classArmId)} Fee Breakdown`;
+        })()} maxWidth="750px">
         {selectedFee && (
           <div className="flex flex-col gap-y-4">
             <div className="flex gap-2 flex-wrap">
               <Chip label={activeSession?.sessionName || '-'} size="small" variant="outlined" />
               <Chip label={getTermLabel(selectedFee.termId)} size="small" variant="outlined" />
-              <Chip label={getArmLabel(selectedFee.classArmId)} size="small" variant="outlined" />
+              {selectedLevelArms.map((a: any) => (
+                <Chip key={a._id} label={getArmLabel(a._id)} size="small" variant="outlined" />
+              ))}
             </div>
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               <table className="w-full text-sm">
@@ -516,13 +599,19 @@ export default function FeeManagement() {
                   </tr></thead>
                   <tbody>
                     {feeStudents.map((s: any) => {
-                      const paid = getTotalPaid(selectedFee._id, s._id);
-                      const bal = totalFeeAmt - paid;
-                      const st = paid >= totalFeeAmt ? 'Paid' : paid > 0 ? 'Partial' : 'Unpaid';
+                      // Each student has their own fee record (one per arm)
+                      const studentFee = getFeeForStudent(s);
+                      const studentFeeAmt = studentFee ? getTotalFee(studentFee) : 0;
+                      const paid = studentFee ? getTotalPaid(studentFee._id, s._id) : 0;
+                      const bal = studentFeeAmt - paid;
+                      const st = paid >= studentFeeAmt && studentFeeAmt > 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Unpaid';
                       return (
                         <tr key={s._id} className="border-t border-gray-100">
-                          <td className="p-2">{s.firstName} {s.surName}</td>
-                          <td className="p-2 text-right">₦{totalFeeAmt.toLocaleString()}</td>
+                          <td className="p-2">
+                            {s.firstName} {s.surName}
+                            <span className="text-gray-400 ml-1">({getArmLabel(s.classArmId)})</span>
+                          </td>
+                          <td className="p-2 text-right">₦{studentFeeAmt.toLocaleString()}</td>
                           <td className="p-2 text-right">₦{paid.toLocaleString()}</td>
                           <td className="p-2 text-right">{bal > 0 ? `₦${bal.toLocaleString()}` : '-'}</td>
                           <td className="p-2 text-center">

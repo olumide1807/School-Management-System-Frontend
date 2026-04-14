@@ -8,7 +8,7 @@ import { setSlide } from "../../../redux/slice/academicSlides";
 import CreateOrEditAnnouncement from "./Modals/CreateEditAnnouncement";
 import SchoolAccModal from "./Modals/SchoolAccModal";
 import { useDispatch, useSelector } from "react-redux";
-import { useGetAccountDetails, useGetAnnoucement, useSessionTerm } from "../../../services/api-call";
+import { useGetAccountDetails, useGetAnnoucement, useSessionTerm, useClassArms, useClassLevels } from "../../../services/api-call";
 import { useNavigate } from "react-router-dom";
 import Button1 from "./Button";
 import MessageModal from "../../../Components/Modals/MessageModal";
@@ -16,7 +16,7 @@ import { deleteAcctDetails, getSchDetails } from '../../../redux/slice/schoolDet
 import { CircularProgress } from "@mui/material";
 import SERVER from "../../../Utils/server";
 import { useQuery } from "@tanstack/react-query";
-
+import { Link } from "react-router-dom";
 
 
 
@@ -83,13 +83,123 @@ const AdminDashboard = () => {
   const allStudents = studentsData?.data || [];
   const allParents = parentsData?.data || [];
   const allStaff = staffData?.data || [];
-
+ 
   const linkedStudents = allStudents.filter((s: any) => s.guardians?.length > 0);
   const unlinkedStudents = allStudents.filter((s: any) => !s.guardians || s.guardians.length === 0);
   const linkedParents = allParents.filter((p: any) => p.isLinked === true);
   const unlinkedParents = allParents.filter((p: any) => !p.isLinked);
   const academicStaff = allStaff.filter((s: any) => s.role === 'academic' || s.staffType === 'academic');
   const nonAcademicStaff = allStaff.filter((s: any) => s.role !== 'academic' && s.staffType !== 'academic');
+ 
+  // ===== PENDING PAYMENTS WIDGET =====
+  const allArms = useClassArms();
+  const allLevels = useClassLevels();
+  const classArms = allArms?.data?.data?.data || [];
+  const classLevels = allLevels?.data?.data?.data || [];
+ 
+  // Get current session ID (from the session we already fetched)
+  const activeSessionForFees = session?.data?.data?.data?.session;
+  const activeTermForFees = session?.data?.data?.data?.term;
+ 
+  // Fetch all terms in current session
+  const { data: allTermsData } = useQuery({
+    queryKey: ['session-terms', activeSessionForFees?._id],
+    queryFn: async () => {
+      const res = await SERVER.get(`session/term/${activeSessionForFees._id}`);
+      return res?.data?.data || [];
+    },
+    enabled: !!activeSessionForFees?._id,
+    retry: false,
+  });
+  const allTerms = allTermsData || [];
+ 
+  // Determine the "reference term" for pending payments
+  const referenceTerm = (() => {
+    if (activeTermForFees?._id) return activeTermForFees;
+    const now = new Date();
+    const parseDate = (d: any) => d ? new Date(d) : null;
+    const endOfDay = (d: Date) => { const e = new Date(d); e.setHours(23, 59, 59, 999); return e; };
+    const startOfDay = (d: Date) => { const s = new Date(d); s.setHours(0, 0, 0, 0); return s; };
+ 
+    const current = allTerms.find((t: any) => {
+      const s = parseDate(t.termStartDate);
+      const e = parseDate(t.termEndDate);
+      return s && e && startOfDay(s) <= now && now <= endOfDay(e);
+    });
+    if (current) return current;
+ 
+    const upcoming = [...allTerms]
+      .filter((t: any) => t.termStartDate && new Date(t.termStartDate) > now)
+      .sort((a: any, b: any) =>
+        new Date(a.termStartDate).getTime() - new Date(b.termStartDate).getTime()
+      );
+    if (upcoming.length > 0) return upcoming[0];
+ 
+    const completed = [...allTerms]
+      .filter((t: any) => t.termEndDate && endOfDay(new Date(t.termEndDate)) < now)
+      .sort((a: any, b: any) =>
+        new Date(b.termEndDate).getTime() - new Date(a.termEndDate).getTime()
+      );
+    return completed[0] || null;
+  })();
+ 
+  // Fetch all fees
+  const { data: feesData } = useQuery({
+    queryKey: ['all-fees'],
+    queryFn: async () => { const res = await SERVER.get('fee'); return res?.data; },
+    retry: false,
+  });
+  const allFees = feesData?.data || [];
+ 
+  // Fetch payments for all fees in the reference term
+  const feesInRefTerm = referenceTerm
+    ? allFees.filter((f: any) => f.termId === referenceTerm._id)
+    : [];
+ 
+  const { data: allPaymentsData } = useQuery({
+    queryKey: ['pending-payments-data', referenceTerm?._id, feesInRefTerm.length],
+    queryFn: async () => {
+      if (feesInRefTerm.length === 0) return [];
+      const results = await Promise.all(
+        feesInRefTerm.map((fee: any) =>
+          SERVER.get(`payment/fee/${fee._id}`).then(r => r?.data?.data || []).catch(() => [])
+        )
+      );
+      return results.flat();
+    },
+    enabled: !!referenceTerm?._id && feesInRefTerm.length > 0,
+    retry: false,
+  });
+  const refTermPayments = allPaymentsData || [];
+ 
+  // Compute pending payments per student
+  const pendingStudents = allStudents.filter((student: any) => {
+    const fee = feesInRefTerm.find((f: any) => f.classArmId === student.classArmId);
+    if (!fee) return false; // No fee set = not considered pending
+    const totalOwed = fee.fees?.reduce(
+      (s: number, f: any) => s + (parseFloat(f.amount) || 0), 0
+    ) || 0;
+    const paid = refTermPayments
+      .filter((p: any) => p.studentId === student._id && p.feeId === fee._id)
+      .reduce((s: number, p: any) => s + (p.amount || 0), 0);
+    return paid < totalOwed; // Unpaid or partial
+  });
+ 
+  // Group pending students by class arm label
+  const pendingByClass: Record<string, number> = {};
+  pendingStudents.forEach((s: any) => {
+    const arm = classArms.find((a: any) => a._id === s.classArmId);
+    const level = arm ? classLevels.find((l: any) => l._id === arm.classLevelId) : null;
+    const label = arm ? `${level?.levelShortName || ''} ${arm.armName?.toUpperCase() || ''}`.trim() : 'Unknown';
+    pendingByClass[label] = (pendingByClass[label] || 0) + 1;
+  });
+  const topClasses = Object.entries(pendingByClass)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+ 
+  const totalStudentsWithFees = allStudents.filter((s: any) =>
+    feesInRefTerm.some((f: any) => f.classArmId === s.classArmId)
+  ).length;
 
   const dashboardStats = [
     {
@@ -304,6 +414,65 @@ const AdminDashboard = () => {
             <StatCard key={i} {...stat} />
           ))}
         </div>
+ 
+        {/* Pending Payments Widget */}
+        {referenceTerm && feesInRefTerm.length > 0 && (
+          <div className="bg-white border border-[#D1D1D1] rounded-[10px] p-6 md:p-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
+              <div>
+                <h3 className="text-lg font-semibold text-black">Pending Fee Payments</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  {referenceTerm.termName} · {activeSessionForFees?.sessionName}
+                </p>
+              </div>
+              <Link
+                to="/school-management/fee-management"
+                className="text-sm text-[#0E7094] hover:underline self-start md:self-auto"
+              >
+                View Fee Management →
+              </Link>
+            </div>
+ 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="bg-red-50 border border-red-100 rounded-xl p-4">
+                <p className="text-xs text-gray-600 mb-1">Students with outstanding fees</p>
+                <p className="text-3xl font-bold text-red-700">{pendingStudents.length}</p>
+              </div>
+              <div className="bg-green-50 border border-green-100 rounded-xl p-4">
+                <p className="text-xs text-gray-600 mb-1">Fully paid</p>
+                <p className="text-3xl font-bold text-green-700">
+                  {Math.max(0, totalStudentsWithFees - pendingStudents.length)}
+                </p>
+              </div>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <p className="text-xs text-gray-600 mb-1">Total students with fees set</p>
+                <p className="text-3xl font-bold text-blue-700">{totalStudentsWithFees}</p>
+              </div>
+            </div>
+ 
+            {topClasses.length > 0 ? (
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-3">
+                  Classes with most unpaid students:
+                </p>
+                <div className="flex flex-col gap-2">
+                  {topClasses.map(([label, count]) => (
+                    <div key={label} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2">
+                      <span className="text-sm font-medium text-black">{label}</span>
+                      <span className="text-sm font-semibold text-red-600">
+                        {count} {count === 1 ? 'student' : 'students'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : pendingStudents.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-green-600 font-medium">🎉 All students with fees are fully paid!</p>
+              </div>
+            ) : null}
+          </div>
+        )}
         <div className="md:flex gap-x-[72px] justify-between block">
           <DetailsCard
             breakdown={[
