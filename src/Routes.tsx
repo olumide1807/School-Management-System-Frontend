@@ -23,6 +23,7 @@ import DashboardLayout from "./Templates/DashboardLayout/index";
 import Settings from "./Pages/AppSettings/index";
 import StaffManagement from "./Pages/Dashboard/StaffManagement/index";
 import StudentManagement from "./Pages/Dashboard/StudentManagement/index";
+import ViewStudentProfile from "./Pages/Dashboard/StudentManagement/ViewStudentProfile";
 // import StudentProfile from "./Pages/Dashboard/StudentManagement/StudentProfile/index";
 import { AddStaffForm } from "./Pages/Dashboard/StaffManagement/AddStaffForm";
 // import AddStudentForm from "./Pages/Forms/AddStudentForm";
@@ -171,8 +172,9 @@ function AllRoutes() {
           <Route path="inventory" element={<Inventory />} />
         </Route>
         <Route path="student-management">
-          <Route index element={<StudentManagement />} />
-        </Route>
+       <Route index element={<StudentManagement />} />
+       <Route path="student-profile/:id" element={<ViewStudentProfile />} />
+     </Route>
         <Route path="staff-management/">
           <Route index element={<StaffManagement />} />
           <Route path="add-staff" element={<AddStaffForm />} />

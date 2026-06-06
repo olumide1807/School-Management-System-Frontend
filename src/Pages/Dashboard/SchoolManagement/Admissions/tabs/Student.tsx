@@ -259,8 +259,7 @@ export default function Student() {
       name: [
         {
           name: "View profile",
-          handleClick: (row: any) =>
-            navigate(`?profile=student&id=${row.id}`, { state: { from: location.pathname } }),
+          handleClick: (row: any) => navigate(`/student-management/student-profile/${row.id}`),
         },
         {
           name: "Deactivate / Activate",
