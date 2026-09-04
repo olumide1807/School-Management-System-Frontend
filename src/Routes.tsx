@@ -24,6 +24,8 @@ import Settings from "./Pages/AppSettings/index";
 import StaffManagement from "./Pages/Dashboard/StaffManagement/index";
 import StudentManagement from "./Pages/Dashboard/StudentManagement/index";
 import ViewStudentProfile from "./Pages/Dashboard/StudentManagement/ViewStudentProfile";
+import ViewParentProfile from "./Pages/Dashboard/StudentManagement/ViewParentProfile";
+import PromoteStudents from "./Pages/Dashboard/StudentManagement/PromoteStudents";
 // import StudentProfile from "./Pages/Dashboard/StudentManagement/StudentProfile/index";
 import { AddStaffForm } from "./Pages/Dashboard/StaffManagement/AddStaffForm";
 // import AddStudentForm from "./Pages/Forms/AddStudentForm";
@@ -31,7 +33,7 @@ import { AddStaffForm } from "./Pages/Dashboard/StaffManagement/AddStaffForm";
 // import ScrollToTop from "./Utils/ScrollToTop";
 
 import ViewStaffProfile from "./Pages/Dashboard/StaffManagement/ViewStaffProfile";
-import EditStaffForm from "./Pages/Dashboard/StaffManagement/EditStaffForm";
+// import EditStaffForm from "./Pages/Dashboard/StaffManagement/EditStaffForm";
 import { useEffect } from "react";
 import { getTokenExpirationTime } from "./Utils/jwtDecode";
 import { logout } from "./redux/slice/userSlice";
@@ -159,7 +161,10 @@ function AllRoutes() {
     // </Routes>
     <Routes>
       {/* DashBoard Screens - Protected: redirect to /login if not authenticated */}
-      <Route path="/" element={currentUser ? <DashboardLayout /> : <Navigate to="/login" />}>
+      <Route
+        path="/"
+        element={currentUser ? <DashboardLayout /> : <Navigate to="/login" />}
+      >
         <Route path="school-management/">
           <Route index element={<AdminDashboard />} />
           <Route path="academics" element={<Academics />} />
@@ -172,25 +177,42 @@ function AllRoutes() {
           <Route path="inventory" element={<Inventory />} />
         </Route>
         <Route path="student-management">
-       <Route index element={<StudentManagement />} />
-       <Route path="student-profile/:id" element={<ViewStudentProfile />} />
-     </Route>
+          <Route index element={<StudentManagement />} />
+          <Route path="student-profile/:id" element={<ViewStudentProfile />} />
+          <Route path="parent-profile/:id" element={<ViewParentProfile />} />
+          <Route path="promote" element={<PromoteStudents />} />
+        </Route>
         <Route path="staff-management/">
           <Route index element={<StaffManagement />} />
           <Route path="add-staff" element={<AddStaffForm />} />
           <Route path="staff-profile/:id" element={<ViewStaffProfile />} />
-          <Route path="staff-profile/edit" element={<EditStaffForm />} />
+          {/* <Route path="staff-profile/edit" element={<EditStaffForm />} /> */}
         </Route>
         <Route path="support" element={<Support />} />
         <Route path="settings" element={<Settings />} />
       </Route>
 
       {/* Auth Screens - redirect to / if already logged in */}
-      <Route path="register" element={!currentUser ? <Register /> : <Navigate to="/" />} />
-      <Route path="login" element={!currentUser ? <Login /> : <Navigate to="/" />} />
-      <Route path="reset-password" element={!currentUser ? <ResetPassword /> : <Navigate to="/" />} />
-      <Route path="verify-otp" element={!currentUser ? <VerifyOtp /> : <Navigate to="/" />} />
-      <Route path="forgot-password" element={!currentUser ? <ForgotPassword /> : <Navigate to="/" />} />
+      <Route
+        path="register"
+        element={!currentUser ? <Register /> : <Navigate to="/" />}
+      />
+      <Route
+        path="login"
+        element={!currentUser ? <Login /> : <Navigate to="/" />}
+      />
+      <Route
+        path="reset-password"
+        element={!currentUser ? <ResetPassword /> : <Navigate to="/" />}
+      />
+      <Route
+        path="verify-otp"
+        element={!currentUser ? <VerifyOtp /> : <Navigate to="/" />}
+      />
+      <Route
+        path="forgot-password"
+        element={!currentUser ? <ForgotPassword /> : <Navigate to="/" />}
+      />
     </Routes>
   );
 }
