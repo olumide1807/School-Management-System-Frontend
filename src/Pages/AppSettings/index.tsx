@@ -62,13 +62,14 @@ function MyProfileTab() {
   });
   const profile = profileData?.data;
 
-  useEffect(() => {
-    if (profile) {
-      const names = (profile.fullName || "").split(" ");
-      setFirstName(names[0] || ""); setLastName(names.slice(1).join(" ") || "");
-      setEmail(profile.emailAddress || ""); setPhone(profile.phoneNumber || "");
+      useEffect(() => {
+    if (profile && !editing) {
+      setFirstName(profile.firstName || (profile.fullName || "").split(" ")[0] || "");
+      setLastName(profile.lastName || (profile.fullName || "").split(" ").slice(1).join(" ") || "");
+      setEmail(profile.emailAddress || "");
+      setPhone(profile.phoneNumber || "");
     }
-  }, [profile]);
+  }, [profile, editing]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -149,6 +150,7 @@ function SchoolDetailsTab() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [country, setCountry] = useState("Nigeria");
+  const [registrationOpen, setRegistrationOpen] = useState(true);
 
   const session = useSessionTerm();
   const activeSession = session?.data?.data?.data?.session;
@@ -159,8 +161,8 @@ function SchoolDetailsTab() {
   const profile = profileData?.data;
   const settings = settingsData?.data;
 
-  useEffect(() => {
-    if (profile) {
+    useEffect(() => {
+    if (profile && !editing) {
       setSchoolName(profile.schoolName || "");
       setSchoolMotto(profile.schoolMotto || "");
       setSchoolEmail(profile.schoolEmailAddress || "");
@@ -170,9 +172,15 @@ function SchoolDetailsTab() {
       setState(profile.schoolAddress?.state || "");
       setCountry(profile.schoolAddress?.country || "Nigeria");
     }
-  }, [profile]);
+  }, [profile, editing]);
 
-  const handleSave = async () => {
+    useEffect(() => {
+    if (settings) {
+      setRegistrationOpen(settings.registrationOpen !== false);
+    }
+  }, [settings]);
+
+    const handleSave = async () => {
     setSaving(true);
     try {
       const payload: any = { schoolName };
@@ -181,20 +189,15 @@ function SchoolDetailsTab() {
       if (schoolEmail) payload.schoolEmailAddress = schoolEmail;
       payload.schoolAddress = { street, city, state, country };
       await SERVER.put("superadmin/update", payload);
+      // Save registration control separately
+      // await SERVER.put("settings", { registrationOpen });
       toast.success("School details updated!", toastOptions);
       queryClient.invalidateQueries({ queryKey: ["admin-profile"] });
-      setEditing(false);
-    } catch (error: any) { toast.error(error?.response?.data?.error || "Update failed", toastOptions); }
-    finally { setSaving(false); }
-  };
-
-  const handleToggleRegistration = async () => {
-    try {
-      const isOpen = settings?.registrationOpen !== false;
-      await SERVER.put("settings", { registrationOpen: !isOpen });
-      toast.success(isOpen ? "Registration closed" : "Registration opened", toastOptions);
       queryClient.invalidateQueries({ queryKey: ["school-settings"] });
-    } catch (error: any) { toast.error(error?.response?.data?.error || "Failed", toastOptions); }
+      setEditing(false);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || "Update failed", toastOptions);
+    } finally { setSaving(false); }
   };
 
   if (isPending) return <Loader />;
@@ -241,15 +244,38 @@ function SchoolDetailsTab() {
         </div>
       </div>
 
+            {/* Registration Control */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-black mb-4">Registration Control</h2>
         <div className="flex items-center justify-between bg-gray-50 rounded-lg p-4">
           <div>
             <p className="text-sm font-medium text-black">Student Registration</p>
-            <p className="text-xs text-gray-500 mt-1">When closed, new students cannot be registered.</p>
+            <p className="text-xs text-gray-500 mt-1">
+              When closed, new students cannot be registered.
+            </p>
           </div>
-          <FormControlLabel control={<Switch checked={settings?.registrationOpen !== false} onChange={handleToggleRegistration} color="success" />}
-            label={settings?.registrationOpen !== false ? "Open" : "Closed"} labelPlacement="start" />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={registrationOpen}
+                onChange={async (e) => {
+                  const newValue = e.target.checked;
+                  setRegistrationOpen(newValue);
+                  try {
+                    await SERVER.put("settings", { registrationOpen: newValue });
+                    toast.success(newValue ? "Registration opened" : "Registration closed", toastOptions);
+                    queryClient.invalidateQueries({ queryKey: ["school-settings"] });
+                  } catch (error: any) {
+                    setRegistrationOpen(!newValue); // revert on failure
+                    toast.error("Failed to update registration status", toastOptions);
+                  }
+                }}
+                color="success"
+              />
+            }
+            label={registrationOpen ? "Open" : "Closed"}
+            labelPlacement="start"
+          />
         </div>
       </div>
 
@@ -282,20 +308,19 @@ function AcademicSettingsTab() {
   const [breaks, setBreaks] = useState<any[]>([]);
   const [savingTimetable, setSavingTimetable] = useState(false);
 
-  const { data: periodData } = useQuery({ queryKey: ["period-settings"], queryFn: async () => { const res = await SERVER.get("timetable-grid/settings"); return res?.data; }, retry: false });
-
   const [schoolStartTime, setSchoolStartTime] = useState("08:00");
   const [gracePeriodMinutes, setGracePeriodMinutes] = useState(15);
   const [savingAttendance, setSavingAttendance] = useState(false);
 
-  useEffect(() => {
-    if (settingsData?.data?.gradingScale) setGrades(settingsData.data.gradingScale);
-  }, [settingsData]);
+  const { data: periodData } = useQuery({ queryKey: ["period-settings"], queryFn: async () => { const res = await SERVER.get("timetable-grid/settings"); return res?.data; }, retry: false });
 
-  if (settingsData?.data?.attendanceSettings) {
-    setSchoolStartTime(settingsData.data.attendanceSettings.schoolStartTime || "08:00");
-    setGracePeriodMinutes(settingsData.data.attendanceSettings.gracePeriodMinutes ?? 15);
-  }
+      useEffect(() => {
+    if (settingsData?.data?.gradingScale) setGrades(settingsData.data.gradingScale);
+    if (settingsData?.data?.attendanceSettings) {
+      setSchoolStartTime(settingsData.data.attendanceSettings.schoolStartTime || "08:00");
+      setGracePeriodMinutes(settingsData.data.attendanceSettings.gracePeriodMinutes ?? 15);
+    }
+  }, [settingsData]);
 
   useEffect(() => {
     const s = periodData?.data;
@@ -328,14 +353,11 @@ function AcademicSettingsTab() {
     finally { setSavingTimetable(false); }
   };
 
-  const handleSaveAttendanceSettings = async () => {
+    const handleSaveAttendanceSettings = async () => {
     setSavingAttendance(true);
     try {
       await SERVER.put("settings", {
-        attendanceSettings: {
-          schoolStartTime,
-          gracePeriodMinutes,
-        }
+        attendanceSettings: { schoolStartTime, gracePeriodMinutes }
       });
       toast.success("Attendance settings saved!", toastOptions);
       queryClient.invalidateQueries({ queryKey: ["school-settings"] });
