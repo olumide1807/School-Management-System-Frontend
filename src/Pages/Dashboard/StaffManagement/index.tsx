@@ -264,6 +264,12 @@ export default function StaffManagement() {
         >
           Add Staff
         </Button>
+
+        <Button variant="outlined" color="tertiary"
+  onClick={() => navigate("/staff-management/attendance")}
+  sx={{ borderRadius: "10px", paddingY: "10px", paddingX: "20px", textTransform: "capitalize" }}>
+  Staff Attendance
+</Button>
       </div>
 
       {/* Stats cards */}

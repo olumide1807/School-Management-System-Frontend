@@ -32,6 +32,8 @@ import { AddStaffForm } from "./Pages/Dashboard/StaffManagement/AddStaffForm";
 // import EditStudentForm from "./Pages/Forms/EditStudentForm";
 // import ScrollToTop from "./Utils/ScrollToTop";
 
+import StaffAttendance from "./Pages/Dashboard/StaffManagement/StaffAttendance";
+
 import ViewStaffProfile from "./Pages/Dashboard/StaffManagement/ViewStaffProfile";
 // import EditStaffForm from "./Pages/Dashboard/StaffManagement/EditStaffForm";
 import { useEffect } from "react";
@@ -186,6 +188,7 @@ function AllRoutes() {
           <Route index element={<StaffManagement />} />
           <Route path="add-staff" element={<AddStaffForm />} />
           <Route path="staff-profile/:id" element={<ViewStaffProfile />} />
+          <Route path="attendance" element={<StaffAttendance />} />
           {/* <Route path="staff-profile/edit" element={<EditStaffForm />} /> */}
         </Route>
         <Route path="support" element={<Support />} />

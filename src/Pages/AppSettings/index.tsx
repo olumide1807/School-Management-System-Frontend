@@ -284,9 +284,18 @@ function AcademicSettingsTab() {
 
   const { data: periodData } = useQuery({ queryKey: ["period-settings"], queryFn: async () => { const res = await SERVER.get("timetable-grid/settings"); return res?.data; }, retry: false });
 
+  const [schoolStartTime, setSchoolStartTime] = useState("08:00");
+  const [gracePeriodMinutes, setGracePeriodMinutes] = useState(15);
+  const [savingAttendance, setSavingAttendance] = useState(false);
+
   useEffect(() => {
     if (settingsData?.data?.gradingScale) setGrades(settingsData.data.gradingScale);
   }, [settingsData]);
+
+  if (settingsData?.data?.attendanceSettings) {
+    setSchoolStartTime(settingsData.data.attendanceSettings.schoolStartTime || "08:00");
+    setGracePeriodMinutes(settingsData.data.attendanceSettings.gracePeriodMinutes ?? 15);
+  }
 
   useEffect(() => {
     const s = periodData?.data;
@@ -319,10 +328,75 @@ function AcademicSettingsTab() {
     finally { setSavingTimetable(false); }
   };
 
+  const handleSaveAttendanceSettings = async () => {
+    setSavingAttendance(true);
+    try {
+      await SERVER.put("settings", {
+        attendanceSettings: {
+          schoolStartTime,
+          gracePeriodMinutes,
+        }
+      });
+      toast.success("Attendance settings saved!", toastOptions);
+      queryClient.invalidateQueries({ queryKey: ["school-settings"] });
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || "Failed", toastOptions);
+    } finally { setSavingAttendance(false); }
+  };
+
   if (isPending) return <Loader />;
 
   return (
     <div className="flex flex-col gap-6">
+       {/* Attendance Settings */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-black">Attendance Settings</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Used to auto-detect late arrivals for staff attendance
+            </p>
+          </div>
+          <Button variant="contained" color="tertiary" size="small" startIcon={<Save />}
+            onClick={handleSaveAttendanceSettings} disabled={savingAttendance}
+            sx={{ color: "white", borderRadius: "8px", textTransform: "capitalize" }}>
+            {savingAttendance ? "Saving..." : "Save"}
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-6">
+          <div className="flex flex-col">
+            <label className="text-xs text-gray-500 mb-1">School Start Time</label>
+            <input type="time" value={schoolStartTime}
+              onChange={(e) => setSchoolStartTime(e.target.value)}
+              className="border border-gray-300 rounded-lg p-2.5 w-36" />
+            <p className="text-xs text-gray-400 mt-1">Arrival after this time = late</p>
+          </div>
+          <div className="flex flex-col">
+            <label className="text-xs text-gray-500 mb-1">Grace Period</label>
+            <select value={gracePeriodMinutes} onChange={(e) => setGracePeriodMinutes(Number(e.target.value))}
+              className="border border-gray-300 rounded-lg p-2.5 w-36 text-sm">
+              <option value={0}>No grace period</option>
+              <option value={5}>5 minutes</option>
+              <option value={10}>10 minutes</option>
+              <option value={15}>15 minutes</option>
+              <option value={20}>20 minutes</option>
+              <option value={30}>30 minutes</option>
+            </select>
+            <p className="text-xs text-gray-400 mt-1">Buffer after start time</p>
+          </div>
+        </div>
+        {schoolStartTime && (
+          <div className="mt-4 bg-gray-50 rounded-lg px-4 py-2 text-xs text-gray-600">
+            Staff arriving by <strong>{(() => {
+              const [h, m] = schoolStartTime.split(":").map(Number);
+              const cutoff = new Date(); cutoff.setHours(h, m + gracePeriodMinutes, 0);
+              return cutoff.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+            })()}</strong> will be marked <span className="text-green-700 font-medium">Present</span>.
+            After that → <span className="text-yellow-700 font-medium">Late</span>.
+          </div>
+        )}
+      </div>
+
       {/* Grading Scale */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
