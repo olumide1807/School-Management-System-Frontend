@@ -1,5 +1,6 @@
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 
+import usePermissions from "./hooks/usePermissions";
 //auth
 import Register from "./Pages/Auth/Register";
 import ResetPassword from "./Pages/Auth/ResetPassword";
@@ -70,6 +71,8 @@ function AllRoutes() {
       }
     }
   }, [currentUser, dispatch]);
+
+  const permissions = usePermissions();
 
   return (
     // <Routes>
@@ -173,10 +176,10 @@ function AllRoutes() {
           <Route path="academics/class/:id" element={<ClassLevel />} />
           <Route path="academics/view" element={<View />} />
           <Route path="academics/view/:id" element={<ViewClassLevel />} />
-          <Route path="admission" element={<Admissions />} />
+          <Route path="admission" element={permissions.canAccessAdmission ? <Admissions /> : <Navigate to="/" />} />
           <Route path="attendance" element={<Attendance />} />
-          <Route path="fee-management" element={<FeeManagement />} />
-          <Route path="inventory" element={<Inventory />} />
+          <Route path="fee-management" element={permissions.canAccessFeeManagement ? <FeeManagement /> : <Navigate to="/" />} />
+          <Route path="inventory" element={permissions.canAccessInventory ? <Inventory /> : <Navigate to="/" />} />
         </Route>
         <Route path="student-management">
           <Route index element={<StudentManagement />} />
@@ -185,14 +188,14 @@ function AllRoutes() {
           <Route path="promote" element={<PromoteStudents />} />
         </Route>
         <Route path="staff-management/">
-          <Route index element={<StaffManagement />} />
-          <Route path="add-staff" element={<AddStaffForm />} />
-          <Route path="staff-profile/:id" element={<ViewStaffProfile />} />
-          <Route path="attendance" element={<StaffAttendance />} />
+          <Route index element={permissions.canAccessStaffManagement ? <StaffManagement /> : <Navigate to="/" />} />
+          <Route path="add-staff" element={permissions.canAccessStaffManagement ? <AddStaffForm /> : <Navigate to="/" />} />
+          <Route path="staff-profile/:id" element={permissions.canAccessStaffManagement ? <ViewStaffProfile /> : <Navigate to="/" />} />
+          <Route path="attendance" element={permissions.canAccessStaffManagement ? <StaffAttendance /> : <Navigate to="/" />} />
           {/* <Route path="staff-profile/edit" element={<EditStaffForm />} /> */}
         </Route>
         <Route path="support" element={<Support />} />
-        <Route path="settings" element={<Settings />} />
+        <Route path="settings" element={permissions.canAccessSettings ? <Settings /> : <Navigate to="/" />} />
       </Route>
 
       {/* Auth Screens - redirect to / if already logged in */}

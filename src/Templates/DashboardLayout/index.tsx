@@ -10,6 +10,8 @@ import MenuLink from "./widgets/MenuLink";
 import { useDispatch } from "react-redux";
 import AdminDashboard from "../../Pages/Dashboard/Home";
 import { logout } from "../../redux/slice/userSlice";
+import { useSelector } from "react-redux";
+import usePermissions from "../../hooks/usePermissions";
 
 export default function DashboardLayout() {
   const [pageTitle, setPageTitle] = useState("");
@@ -71,6 +73,19 @@ export default function DashboardLayout() {
     }
   }, [location.pathname]);
 
+  const permissions = usePermissions();
+  const userData = useSelector((state: any) => state.user?.user);
+  const role = useSelector((state: any) => state.user?.role);
+
+  // Display name based on role
+  const displayName = role === "super admin"
+    ? "Super Admin"
+    : role === "admin"
+    ? "Admin"
+    : userData?.firstName
+    ? `${userData.firstName} ${userData.surname || ""}`.trim()
+    : "Staff";
+
   return (
     <div className="max-h-screen overflow-hidden py-5 pr-0 flex items-stretch">
       <aside
@@ -86,13 +101,22 @@ export default function DashboardLayout() {
             alt="logo"
             className="ml-[34px] mt-7 mb-[30px] h-[52px] w-[52px]"
           />
-          <p className="font-semibold text-2xl text-black ml-3">Super Admin</p>
+          <div className="flex flex-col ml-3">
+            <p className="font-semibold text-lg text-black leading-tight">{displayName}</p>
+            <p className="text-xs text-gray-400 capitalize">{role || "staff"}</p>
+          </div>
         </div>
 
         <div className="flex flex-col justify-between h-full">
           <div className="flex-1 overflow-y-auto">
             <ul className="flex flex-col gap-y-6 text-text-sec">
-              {MenuLink.map((menu, i) =>
+              {MenuLink.filter((menu) => {
+                  if (menu.name === "School Management") return permissions.canAccessSchoolManagement;
+                  if (menu.name === "Staff Management") return permissions.canAccessStaffManagement;
+                  if (menu.name === "Student Management") return permissions.canAccessStudentManagement;
+                  if (menu.name === "Settings") return permissions.canAccessSettings;
+                  return true; // Dashboard, Support always visible
+                }).map((menu, i) =>
                 menu.name === "School Management" ? (
                   <div key={i}>
                     <div className="flex flex-row gap-x-5">
@@ -120,7 +144,12 @@ export default function DashboardLayout() {
                         schMgtDropdown ? "flex" : "hidden"
                       }`}
                     >
-                      {menu.sublinks?.map((sublink, i) => (
+                      {menu.sublinks?.filter((sublink) => {
+  if (sublink.name === "Admission") return permissions.canAccessAdmission;
+  if (sublink.name === "Fee Management") return permissions.canAccessFeeManagement;
+  if (sublink.name === "Inventory") return permissions.canAccessInventory;
+  return true;
+}).map((sublink, i) => (
                         <li
                           key={i}
                           onClick={() => {

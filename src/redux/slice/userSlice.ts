@@ -1,35 +1,47 @@
 import { createSlice } from "@reduxjs/toolkit";
 
+const initialState = {
+    currentUser: sessionStorage.getItem("token") || null,
+    token: sessionStorage.getItem("token") || null,
+    role: sessionStorage.getItem("userRole") || null,
+    user: JSON.parse(sessionStorage.getItem("userData") || "null"),
+    loading: false,
+    error: false,
+};
+
 const userSlice = createSlice({
-    name: 'user',
-    initialState: {
-        currentUser: sessionStorage.getItem('token') || null,
-        loading: false,
-        error: false
-    },
+    name: "user",
+    initialState,
     reducers: {
-        loginStart: (state)=>{
+        loginStart: (state) => {
             state.loading = true;
-            state.currentUser = null;
-            state.error = false
+            state.error = false;
         },
-        loginSuccess: (state, action)=>{
+        loginSuccess: (state, action) => {
             state.loading = false;
-            state.currentUser = action.payload;
-            state.error = false
+            state.currentUser = action.payload.token;
+            state.token = action.payload.token;
+            state.role = action.payload.role;
+            state.user = action.payload.user;
+            state.error = false;
         },
-        loginFailure: (state)=>{
+        loginFailure: (state) => {
             state.loading = false;
             state.error = true;
-            state.currentUser = null;
         },
         logout: (state) => {
             state.currentUser = null;
+            state.token = null;
+            state.role = null;
+            state.user = null;
+            state.loading = false;
             state.error = false;
-            state.loading = false
-        }
-    }
-})
+            sessionStorage.removeItem("token");
+            sessionStorage.removeItem("userRole");
+            sessionStorage.removeItem("userData");
+        },
+    },
+});
 
 export const { loginStart, loginSuccess, loginFailure, logout } = userSlice.actions;
-export default userSlice.reducer
+export default userSlice.reducer;
