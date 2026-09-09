@@ -137,7 +137,11 @@ export function AddStaffForm() {
       };
 
       await SERVER.post("staff", payload);
-      toast.success("Staff created successfully! Login credentials have been sent to their email.", toastOptions);
+      const staffData = res?.data?.data;
+      const passwordMsg = staffData?.temporaryPassword 
+          ? `Staff ID: ${staffData.staffID} | Email: ${staffData.emailAddress} | Password: ${staffData.temporaryPassword}`
+          : "Login credentials sent to their email.";
+      toast.success(`Staff created! ${passwordMsg}`, { ...toastOptions, autoClose: 15000 });
       queryClient.invalidateQueries({ queryKey: ["all-staff"] });
       navigate("/staff-management");
     } catch (error: any) {

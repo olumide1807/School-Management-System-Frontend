@@ -88,6 +88,7 @@ const SubjectDetail = () => {
         { key: "class", name: "Class" },
         { key: "teacher", name: "Teacher" },
         { key: "subjectCode", name: "Subject Code" },
+        { key: "actions", name: "Actions" },
     ];
 
     const tableData = specifics.map((sp: any, i: number) => ({
@@ -95,6 +96,22 @@ const SubjectDetail = () => {
         class: getArmLabel(sp.classArmId),
         teacher: getTeacherName(sp.subjectTeacherId),
         subjectCode: sp.subjectCode || '-',
+        actions: (
+            <Button
+                size="small"
+                color="tertiary"
+                variant="outlined"
+                onClick={() => openAssignModal(sp)}
+                sx={{
+                    borderRadius: "8px",
+                    textTransform: "none",
+                    fontSize: "12px",
+                    whiteSpace: "nowrap",
+                }}
+            >
+                {sp.subjectTeacherId ? "Change teacher" : "Assign teacher"}
+            </Button>
+        ),
         _raw: sp,
     }));
 
@@ -132,6 +149,7 @@ const SubjectDetail = () => {
             }
 
             queryClient.invalidateQueries({ queryKey: ['subject-specifics', subjectId] });
+            queryClient.invalidateQueries({ queryKey: ['subject-class-counts'] });
             queryClient.invalidateQueries({ queryKey: ['all-specific-subjects'] });
             queryClient.invalidateQueries({ queryKey: ['arm-subject-counts'] });
             setOpenManageClasses(false);
@@ -163,9 +181,9 @@ const SubjectDetail = () => {
         }
     };
 
-    const handleRowClick = (row: any) => {
-        setSelectedSpecific(row._raw);
-        setSelectedTeacherId(row._raw?.subjectTeacherId || "");
+    const openAssignModal = (sp: any) => {
+        setSelectedSpecific(sp);
+        setSelectedTeacherId(sp?.subjectTeacherId || "");
         setOpenAssignTeacher(true);
     };
 
@@ -212,8 +230,6 @@ const SubjectDetail = () => {
                 </div>
             </div>
 
-            <p className="text-sm text-gray-500 mb-2">Click on a row to assign/change the teacher</p>
-
             {isPending ? (
                 <Loader />
             ) : specifics.length === 0 ? (
@@ -229,7 +245,7 @@ const SubjectDetail = () => {
                 <BasicTable
                     headcells={headcells}
                     tableData={tableData}
-                    onClick={handleRowClick}
+                    onClick={() => {}}
                     sideIcon={false}
                 />
             )}

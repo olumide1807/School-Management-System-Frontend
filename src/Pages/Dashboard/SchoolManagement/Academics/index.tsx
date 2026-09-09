@@ -14,7 +14,7 @@ import { setSlide } from "../../../../redux/slice/academicSlides";
 
 export default function Academics() {
   const dispatch = useDispatch();
-  const presentStep = useSelector((state: any) => state.academicSlides.slideNo);
+  const presentStep = useSelector((state: any) => state.academicSlides?.slideNo) || 1;
   const stepComponents: Record<number, JSX.Element> = {
     1: <Classes />,
     2: <Subjects />,
@@ -54,7 +54,7 @@ export default function Academics() {
         </div>
         <hr className="border border-[#CCE9F4]" />
       </div>
-      {stepComponents[presentStep]}
+      {stepComponents[presentStep] || stepComponents[1]}
     </div>
   );
 }

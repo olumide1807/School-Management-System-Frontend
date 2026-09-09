@@ -17,7 +17,7 @@ export default function ForgotPassword() {
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post(API_URL + "superadmin/forgotpassword", {
+      const res = await axios.post(API_URL + "/superadmin/forgotpassword", {
         email: email,
       });
       if (res.data.success === true) {
@@ -26,8 +26,9 @@ export default function ForgotPassword() {
       } else {
         return setError("Email does not exist");
       }
-    } catch (error) {
-      return setError("The email you entered is not valid");
+    } catch (error: any) {
+      console.log("Forgot password error:", error?.response?.data);
+      return setError(error?.response?.data?.error || "The email you entered is not valid");
     }
   };
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
@@ -40,22 +40,25 @@ const Subjects = () => {
 	const classLevels = allLevels?.data?.data?.data || [];
 	const isLoading = allSubjects?.isPending;
 
-	// Fetch all specific subjects to count classes per subject
+	// Fetch every specific subject in one call, then count per subject
 	const { data: allSpecificData } = useQuery({
 		queryKey: ['all-specific-subjects'],
 		queryFn: async () => {
-			const promises = subjects.map((s: any) =>
-				SERVER.get(`subject/${s._id}/all`).then(res => ({
-					subjectId: s._id,
-					specifics: res?.data?.data || []
-				})).catch(() => ({ subjectId: s._id, specifics: [] }))
-			);
-			return Promise.all(promises);
+			const res = await SERVER.get('subject?find=allSpecificSubjects');
+			return res?.data;
 		},
-		enabled: subjects.length > 0,
+		retry: false,
 	});
 
-	const specificsBySubject = allSpecificData || [];
+	const countBySubjectId = useMemo(() => {
+		const list = Array.isArray(allSpecificData?.data) ? allSpecificData.data : [];
+		return list.reduce((acc: Record<string, number>, sp: any) => {
+			acc[sp.subjectId] = (acc[sp.subjectId] || 0) + 1;
+			return acc;
+		}, {});
+	}, [allSpecificData]);
+
+	const specificsBySubject = Array.isArray(allSpecificData) ? allSpecificData : [];
 
 	// Build class arm labels for display
 	const getArmLabel = (classArmId: string) => {
@@ -67,19 +70,15 @@ const Subjects = () => {
 
 	// Build table data
 	const tableData = subjects
-		.filter((s: any) => s.subjectName?.toLowerCase().includes(searchTerm.toLowerCase()))
-		.map((subject: any, i: number) => {
-			const specifics = specificsBySubject.find((sp: any) => sp.subjectId === subject._id);
-			const classCount = specifics?.specifics?.length || 0;
-			return {
-				sn: i + 1,
-				name: subject.subjectName,
-				classCount: classCount,
-				actions: '',
-				id: subject._id,
-				_raw: subject,
-			};
-		});
+    .filter((s: any) => s.subjectName?.toLowerCase().includes(searchTerm.toLowerCase()))
+    .map((subject: any, i: number) => ({
+        sn: i + 1,
+        name: subject.subjectName,
+        classCount: countBySubjectId[subject._id] || 0,
+        actions: '',
+        id: subject._id,
+        _raw: subject,
+    }));
 
 	const headcells = [
 		{ key: "sn", name: "S/N" },
@@ -122,6 +121,7 @@ const Subjects = () => {
 			});
 			toast.success('Subject created successfully!', toastOptions);
 			queryClient.invalidateQueries({ queryKey: ['all-subjects'] });
+			queryClient.invalidateQueries({ queryKey: ['subject-class-counts'] });
 			queryClient.invalidateQueries({ queryKey: ['all-specific-subjects'] });
 			queryClient.invalidateQueries({ queryKey: ['arm-subject-counts'] });
 			methods.reset();
@@ -141,6 +141,7 @@ const Subjects = () => {
 			await SERVER.delete(`subject/${subjectToDelete.id}`);
 			toast.success('Subject deleted successfully!', toastOptions);
 			queryClient.invalidateQueries({ queryKey: ['all-subjects'] });
+			queryClient.invalidateQueries({ queryKey: ['subject-class-counts'] });
 			queryClient.invalidateQueries({ queryKey: ['all-specific-subjects'] });
 			queryClient.invalidateQueries({ queryKey: ['arm-subject-counts'] });
 			setOpenDeleteSubject(false);
