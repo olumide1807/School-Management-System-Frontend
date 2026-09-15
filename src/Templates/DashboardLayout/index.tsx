@@ -6,9 +6,10 @@ import MessageModal from "../../Components/Modals/MessageModal";
 import BasitechLogo2 from "../../assets/icons/BasitechLogo2.svg";
 import LogoutIcon from "../../Components/Vectors/LogoutIcon";
 import CustomLink from "../../Components/CustomLink";
-import MenuLink from "./widgets/MenuLink";
+import { getMenuLinks } from "./widgets/MenuLink";
 import { useDispatch } from "react-redux";
 import AdminDashboard from "../../Pages/Dashboard/Home";
+import TeacherDashboard from "../../Pages/Dashboard/Teacher";
 import { logout } from "../../redux/slice/userSlice";
 import { useSelector } from "react-redux";
 import usePermissions from "../../hooks/usePermissions";
@@ -23,7 +24,7 @@ export default function DashboardLayout() {
   // const match2 = function (path) {
   //   return Boolean(location.pathname.includes(path));
   // };
-  const APP_URL = window.location.pathname;
+  // const APP_URL = window.location.pathname;
   // const { search } = useLocation();
   // const params = new URLSearchParams(search);
   // const tab = params.get("tab");
@@ -76,6 +77,7 @@ export default function DashboardLayout() {
   const permissions = usePermissions();
   const userData = useSelector((state: any) => state.user?.user);
   const role = useSelector((state: any) => state.user?.role);
+  const menuLinks = getMenuLinks(role, userData?.staffType === "academic");
 
   // Display name based on role
   const displayName = role === "super admin"
@@ -110,13 +112,13 @@ export default function DashboardLayout() {
         <div className="flex flex-col justify-between h-full">
           <div className="flex-1 overflow-y-auto">
             <ul className="flex flex-col gap-y-6 text-text-sec">
-              {MenuLink.filter((menu) => {
-                  if (menu.name === "School Management") return permissions.canAccessSchoolManagement;
-                  if (menu.name === "Staff Management") return permissions.canAccessStaffManagement;
-                  if (menu.name === "Student Management") return permissions.canAccessStudentManagement;
-                  if (menu.name === "Settings") return permissions.canAccessSettings;
-                  return true; // Dashboard, Support always visible
-                }).map((menu, i) =>
+              {menuLinks.filter((menu) => {
+                if (menu.name === "School Management") return permissions.canAccessSchoolManagement;
+                if (menu.name === "Staff Management") return permissions.canAccessStaffManagement;
+                if (menu.name === "Student Management") return permissions.canAccessStudentManagement;
+                if (menu.name === "Settings") return permissions.canAccessSettings;
+                return true;
+              }).map((menu, i) =>
                 menu.name === "School Management" ? (
                   <div key={i}>
                     <div className="flex flex-row gap-x-5">
@@ -234,7 +236,7 @@ export default function DashboardLayout() {
         <div
           ref={scrollRef}
           className={`lg:border border-[#DEE0E0] rounded-[20px] flex-grow py-6 px-[18px] w-full md:w-[99%] relative ${
-            APP_URL.includes("/support") ? "md:bg-bg-2" : "bg-white"
+            location.pathname.includes("/support")
           }`}
         >
           <div className="flex flex-col">
@@ -250,7 +252,13 @@ export default function DashboardLayout() {
                 />
               )}
             </div>
-            {APP_URL !== "/" ? <Outlet /> : <AdminDashboard />}
+            {location.pathname !== "/" ? (
+              <Outlet />
+            ) : permissions.isTeacher ? (
+              <TeacherDashboard />
+            ) : (
+              <AdminDashboard />
+            )}
           </div>
         </div>
       </div>

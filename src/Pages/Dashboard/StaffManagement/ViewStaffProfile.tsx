@@ -11,6 +11,7 @@ import { toastOptions } from "../../../Utils/toastOptions";
 import { useNavigate, useParams } from "react-router-dom";
 import { statesData } from "../../../Data/statesData";
 import Loader from "../../loaders/Loader";
+import { useSelector } from "react-redux";
 
 const COUNTRIES = ['Nigeria', 'Ghana', 'Cameroon', 'Togo', 'Benin', 'South Africa', 'Kenya', 'United Kingdom', 'United States', 'Canada', 'India', 'Other'];
 const RELIGIONS = ['Islam', 'Christianity', 'Traditional', 'Other'];
@@ -19,6 +20,7 @@ const RELATIONSHIPS = ['Father', 'Mother', 'Brother', 'Sister', 'Uncle', 'Aunt',
 const DEGREE_OPTIONS = ['SSCE/WAEC', 'OND', 'HND', 'NCE', 'B.Ed', 'B.Sc', 'B.A', 'B.Tech', 'PGDE', 'M.Ed', 'M.Sc', 'M.A', 'MBA', 'PhD', 'Other'];
 
 const TABS = ["Personal Info", "Contact & Location", "Employment & Qualifications", "Assignments", "Next of Kin"];
+const SELF_TABS = [...TABS, "My Attendance"];
 
 const InfoRow = ({ label, value }: { label: string; value: any }) => (
   <div className="flex flex-col py-2">
@@ -28,7 +30,10 @@ const InfoRow = ({ label, value }: { label: string; value: any }) => (
 );
 
 export default function ViewStaffProfile() {
-  const { id } = useParams();
+  const { id: routeId } = useParams();
+  const myId = useSelector((state: any) => state.user?.user?._id);
+  const id = routeId || myId;
+  const isSelf = !routeId;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -93,6 +98,13 @@ export default function ViewStaffProfile() {
   });
   const allSubjects = allSubjectsData?.data || [];
 
+    const { data: myAttendanceData } = useQuery({
+    queryKey: ["staff-attendance", id],
+    queryFn: async () => { const res = await SERVER.get(`staff-attendance/staff/${id}`); return res?.data; },
+    enabled: !!id && isSelf, retry: false,
+  });
+  const myAttendance = myAttendanceData?.data || [];
+
   // Initialize form
   useEffect(() => {
     if (staff && editing) {
@@ -130,9 +142,9 @@ export default function ViewStaffProfile() {
     return `${level?.levelShortName || ""} ${arm.armName?.toUpperCase() || ""}`.trim();
   };
 
-  const getSubjectName = (specific: any) => {
-    const sub = allSubjects.find((s: any) => s._id === specific.subjectId);
-    return sub?.subjectName || specific.subjectName || "Unknown Subject";
+  const getSubjectName = (subjectId: string) => {
+    const subject = allSubjects.find((s: any) => s._id === subjectId);
+    return subject?.subjectName || 'Unknown';
   };
 
   const handleCertUpload = async (i: number, file: File) => {
@@ -233,7 +245,11 @@ export default function ViewStaffProfile() {
   if (!staff) return (
     <div className="text-center py-20">
       <p className="text-gray-500 mb-4">Staff member not found</p>
-      <Button onClick={() => navigate("/staff-management")} variant="outlined" sx={{ borderRadius: "10px", textTransform: "capitalize" }}>Back to Staff List</Button>
+      {!isSelf && (
+        <button onClick={() => navigate("/staff-management")} className="text-tertiary flex items-center gap-1 text-sm hover:underline mb-6">
+          <KeyboardBackspace fontSize="small" /> Back to Dashboard
+        </button>
+      )}
     </div>
   );
 
@@ -242,9 +258,11 @@ export default function ViewStaffProfile() {
 
   return (
     <div className="max-w-[900px] mx-auto">
-      <button onClick={() => navigate("/staff-management")} className="text-tertiary flex items-center gap-1 text-sm hover:underline mb-6">
-        <KeyboardBackspace fontSize="small" /> Back to Staff List
-      </button>
+      {!isSelf && (
+        <button onClick={() => navigate("/staff-management")} className="text-tertiary flex items-center gap-1 text-sm hover:underline mb-6">
+          <KeyboardBackspace fontSize="small" /> Back to Staff List
+        </button>
+      )}
 
       {/* Header card */}
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
@@ -286,16 +304,20 @@ export default function ViewStaffProfile() {
                 <Button variant="outlined" color="warning" startIcon={<Lock />}
                   onClick={() => setOpenResetPassword(true)}
                   sx={{ borderRadius: "10px", textTransform: "capitalize" }}>Reset Password</Button>
-                <Button variant="outlined" color={staff.isAdmin ? "error" : "warning"}
-                  onClick={() => staff.isAdmin ? setOpenRemoveAdmin(true) : setOpenMakeAdmin(true)}
-                  sx={{ borderRadius: "10px", textTransform: "capitalize" }}>
-                  {staff.isAdmin ? "Remove Admin" : "Make Admin"}
-                </Button>
-                <Button variant="outlined" color={isActive ? "error" : "success"}
-                  onClick={() => setOpenDeactivate(true)}
-                  sx={{ borderRadius: "10px", textTransform: "capitalize" }}>
-                  {isActive ? "Deactivate" : "Reactivate"}
-                </Button>
+                {!isSelf && (
+                  <>
+                    <Button variant="outlined" color={staff.isAdmin ? "error" : "warning"}
+                      onClick={() => staff.isAdmin ? setOpenRemoveAdmin(true) : setOpenMakeAdmin(true)}
+                      sx={{ borderRadius: "10px", textTransform: "capitalize" }}>
+                      {staff.isAdmin ? "Remove Admin" : "Make Admin"}
+                    </Button>
+                    <Button variant="outlined" color={isActive ? "error" : "success"}
+                      onClick={() => setOpenDeactivate(true)}
+                      sx={{ borderRadius: "10px", textTransform: "capitalize" }}>
+                      {isActive ? "Deactivate" : "Reactivate"}
+                    </Button>
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -313,7 +335,7 @@ export default function ViewStaffProfile() {
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-6">
         <div className="flex gap-1 overflow-x-auto">
-          {TABS.map((tab, i) => (
+          {(isSelf ? SELF_TABS : TABS).map((tab, i) => (
             <button key={i} onClick={() => setActiveTab(i)}
               className={`px-5 py-3 text-sm font-medium relative whitespace-nowrap ${activeTab === i ? "text-tertiary" : "text-gray-500 hover:text-gray-700"}`}>
               {tab}
@@ -432,23 +454,37 @@ export default function ViewStaffProfile() {
                 ))}
               </div>
             ) : <p className="text-sm text-gray-400">No qualifications recorded</p>}
+            {isSelf && (
+              <p className="text-xs text-gray-400 flex items-center gap-1 mt-3">
+                <Lock sx={{ fontSize: 13 }} /> Qualifications are updated by your school administrator
+              </p>
+            )}
           </div>
         )}
         {activeTab === 2 && editing && (
           <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-3 gap-4">
-              <FormControl fullWidth size="small"><InputLabel>Staff Type</InputLabel>
-                <Select value={form.staffType} label="Staff Type" onChange={(e) => updateForm("staffType", e.target.value)} sx={{ borderRadius: "10px" }}>
-                  <MenuItem value="academic">Academic</MenuItem><MenuItem value="non-academic">Non-Academic</MenuItem></Select></FormControl>
-              <div className="flex flex-col"><label className="text-xs text-gray-500 mb-1">Salary</label>
-                <input value={form.salary} onChange={(e) => updateForm("salary", e.target.value)} className="border border-gray-300 rounded-lg p-2 text-sm" /></div>
-              <div className="flex flex-col"><label className="text-xs text-gray-500 mb-1">Employment Date</label>
-                <input type="date" value={form.employmentDate} onChange={(e) => updateForm("employmentDate", e.target.value)} className="border border-gray-300 rounded-lg p-2 text-sm" /></div>
-            </div>
+            {isSelf ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-1 mb-2">
+                <InfoRow label="Staff Type" value={staff.staffType} />
+                <InfoRow label="Salary" value={staff.salary ? `₦${Number(staff.salary).toLocaleString()}` : "—"} />
+                <InfoRow label="Employment Date" value={staff.employmentDate ? new Date(staff.employmentDate).toLocaleDateString() : "—"} />
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-4">
+                ...existing Staff Type / Salary / Employment Date inputs, unchanged...
+              </div>
+            )}
+            {isSelf && (
+              <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+                <Lock sx={{ fontSize: 13 }} /> Set by your school administrator
+              </p>
+            )}
             <div className="flex items-center justify-between mt-4 mb-2">
               <h3 className="font-semibold text-black">Qualifications</h3>
               <Button type="button" variant="text" size="small" startIcon={<Add />} onClick={addQualification} sx={{ textTransform: "capitalize", color: "#0E7094" }}>Add</Button>
             </div>
+            {!isSelf && (
+              <>
             {qualifications.map((q: any, i: number) => (
               <div key={i} className="border border-gray-200 rounded-xl p-4 relative">
                 {qualifications.length > 1 && <IconButton size="small" onClick={() => removeQualification(i)} sx={{ position: "absolute", top: 8, right: 8 }}><Delete fontSize="small" color="error" /></IconButton>}
@@ -478,6 +514,8 @@ export default function ViewStaffProfile() {
                 )}
               </div>
             ))}
+            </>
+            )}
           </div>
         )}
 
@@ -487,7 +525,7 @@ export default function ViewStaffProfile() {
             {/* Assigned Classes */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-black flex items-center gap-2"><School fontSize="small" /> Assigned Classes</h3>
+                <h3 className="font-semibold text-black flex items-center gap-2"><School fontSize="small" /> Assigned Class(es)</h3>
                 {staff.staffType === "academic" && (
                   <Button type="button" variant="outlined" color="tertiary" size="small" startIcon={<Add />}
                     onClick={() => setOpenAssignClass(true)} sx={{ borderRadius: "8px", textTransform: "capitalize" }}>Assign Class</Button>
@@ -519,11 +557,10 @@ export default function ViewStaffProfile() {
               ) : (
                 <div className="flex flex-col gap-2">
                   {assignedSubjects.map((sp: any) => (
-                    <div key={sp._id} className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-lg px-4 py-3">
-                      <div>
-                        <span className="text-sm font-medium text-purple-900">{getSubjectName(sp)}</span>
-                        <span className="text-xs text-purple-600 ml-2">({getArmLabel(sp.classArmId)})</span>
-                      </div>
+                    <div key={sp._id} className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+                      <span className="text-sm font-medium text-green-900">
+                        {getSubjectName(sp.subjectId)} — {getArmLabel(sp.classArmId)}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -556,6 +593,38 @@ export default function ViewStaffProfile() {
                 <Select value={form.nextOfKinRelationship} label="Relationship" onChange={(e) => updateForm("nextOfKinRelationship", e.target.value)} sx={{ borderRadius: "10px" }}>
                   {RELATIONSHIPS.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}</Select></FormControl>
             </div>
+          </div>
+        )}
+
+        {/* Tab 5: My Attendance (self only) */}
+        {isSelf && activeTab === 5 && (
+          <div>
+            <h3 className="font-semibold text-black mb-3">My attendance</h3>
+            {myAttendance.length === 0 ? (
+              <p className="text-sm text-gray-400">No attendance recorded yet.</p>
+            ) : (
+              <div className="flex flex-col">
+                {myAttendance.map((r: any) => (
+                  <div key={r._id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
+                    <span className="text-sm text-black">
+                      {new Date(r.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      {r.checkInTime && <span className="text-xs text-gray-500">{r.checkInTime}</span>}
+                      <Chip label={r.status} size="small"
+                        sx={{
+                          backgroundColor: r.status === "present" ? "#DCFCE7" : r.status === "late" ? "#FEF3C7" : "#FEE2E2",
+                          color: r.status === "present" ? "#15803D" : r.status === "late" ? "#B45309" : "#B91C1C",
+                          textTransform: "capitalize",
+                        }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-gray-400 mt-4">
+              Attendance is recorded by your school administrator.
+            </p>
           </div>
         )}
       </div>

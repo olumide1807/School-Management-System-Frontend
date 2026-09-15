@@ -11,6 +11,7 @@ import ViewClassLevel from "./tabs/tab2/ViewClassLevel";
 import SubjectDetail from "./tabs/SubjectDetail";
 import { useDispatch, useSelector } from "react-redux";
 import { setSlide } from "../../../../redux/slice/academicSlides";
+import AssessmentFormat from "./tabs/AssessmentFormat";
 
 export default function Academics() {
   const dispatch = useDispatch();
@@ -21,6 +22,7 @@ export default function Academics() {
     3: <SessionTerms />,
     4: <Timetable />,
     5: <GradingSystem />,
+    6: <AssessmentFormat />,
   };
 
   const [searchParams] = useSearchParams();
@@ -80,4 +82,8 @@ const steps = [
     id: 5,
     name: "Grading System",
   },
+  {
+    id: 6,
+    name: "Assessment Format",
+  }
 ];

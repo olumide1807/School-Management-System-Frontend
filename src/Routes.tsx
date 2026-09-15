@@ -29,12 +29,13 @@ import ViewParentProfile from "./Pages/Dashboard/StudentManagement/ViewParentPro
 import PromoteStudents from "./Pages/Dashboard/StudentManagement/PromoteStudents";
 // import StudentProfile from "./Pages/Dashboard/StudentManagement/StudentProfile/index";
 import { AddStaffForm } from "./Pages/Dashboard/StaffManagement/AddStaffForm";
+import Grading from "./Pages/Dashboard/Grading";
 // import AddStudentForm from "./Pages/Forms/AddStudentForm";
 // import EditStudentForm from "./Pages/Forms/EditStudentForm";
 // import ScrollToTop from "./Utils/ScrollToTop";
 
 import StaffAttendance from "./Pages/Dashboard/StaffManagement/StaffAttendance";
-
+import MyStudents from "./Pages/Dashboard/MyStudents";
 import ViewStaffProfile from "./Pages/Dashboard/StaffManagement/ViewStaffProfile";
 // import EditStaffForm from "./Pages/Dashboard/StaffManagement/EditStaffForm";
 import { useEffect } from "react";
@@ -171,19 +172,19 @@ function AllRoutes() {
         element={currentUser ? <DashboardLayout /> : <Navigate to="/login" />}
       >
         <Route path="school-management/">
-          <Route index element={<AdminDashboard />} />
-          <Route path="academics" element={<Academics />} />
-          <Route path="academics/class/:id" element={<ClassLevel />} />
-          <Route path="academics/view" element={<View />} />
-          <Route path="academics/view/:id" element={<ViewClassLevel />} />
+          <Route index element={permissions.canAccessSchoolManagement ? <AdminDashboard /> : <Navigate to="/" />} />
+          <Route path="academics" element={permissions.canAccessAcademics ? <Academics /> : <Navigate to="/" />} />
+          <Route path="academics/class/:id" element={permissions.canAccessAcademics ? <ClassLevel /> : <Navigate to="/" />} />
+          <Route path="academics/view" element={permissions.canAccessAcademics ? <View /> : <Navigate to="/" />} />
+          <Route path="academics/view/:id" element={permissions.canAccessAcademics ? <ViewClassLevel /> : <Navigate to="/" />} />
+          <Route path="attendance" element={permissions.canAccessAttendance ? <Attendance /> : <Navigate to="/" />} />
           <Route path="admission" element={permissions.canAccessAdmission ? <Admissions /> : <Navigate to="/" />} />
-          <Route path="attendance" element={<Attendance />} />
           <Route path="fee-management" element={permissions.canAccessFeeManagement ? <FeeManagement /> : <Navigate to="/" />} />
           <Route path="inventory" element={permissions.canAccessInventory ? <Inventory /> : <Navigate to="/" />} />
         </Route>
         <Route path="student-management">
-          <Route index element={<StudentManagement />} />
-          <Route path="student-profile/:id" element={<ViewStudentProfile />} />
+          <Route index element={permissions.canAccessStudentManagement ? <StudentManagement /> : <Navigate to="/" />} />
+          <Route path="student-profile/:id" element={permissions.canAccessStudentManagement ? <ViewStudentProfile /> : <Navigate to="/" />} />
           <Route path="parent-profile/:id" element={<ViewParentProfile />} />
           <Route path="promote" element={<PromoteStudents />} />
         </Route>
@@ -194,6 +195,9 @@ function AllRoutes() {
           <Route path="attendance" element={permissions.canAccessStaffManagement ? <StaffAttendance /> : <Navigate to="/" />} />
           {/* <Route path="staff-profile/edit" element={<EditStaffForm />} /> */}
         </Route>
+        <Route path="grading" element={<Grading />} />
+        <Route path="my-students" element={<MyStudents />} />
+        <Route path="my-profile" element={<ViewStaffProfile />} />
         <Route path="support" element={<Support />} />
         <Route path="settings" element={permissions.canAccessSettings ? <Settings /> : <Navigate to="/" />} />
       </Route>

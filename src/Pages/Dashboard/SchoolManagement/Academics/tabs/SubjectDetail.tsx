@@ -56,7 +56,10 @@ const SubjectDetail = () => {
     });
 
     const specifics = specificsData?.data || [];
-    const staff = staffData?.data || [];
+    const allStaff = staffData?.data || [];
+    const staff = allStaff.filter(
+        (s: any) => s.staffType === "academic" && s.isActive !== false
+    );
     const assignedArmIds = specifics.map((sp: any) => sp.classArmId);
 
     // Sync checkedArmIds when specifics load or modal opens
@@ -75,7 +78,7 @@ const SubjectDetail = () => {
     // Helper to get teacher name
     const getTeacherName = (teacherId: string) => {
         if (!teacherId) return 'Not assigned';
-        const teacher = staff.find((s: any) => s._id === teacherId);
+        const teacher = allStaff.find((s: any) => s._id === teacherId);
         return teacher ? `${teacher.firstName || ''} ${teacher.surname || teacher.lastName || ''}`.trim() : 'Not assigned';
     };
 
@@ -306,7 +309,7 @@ const SubjectDetail = () => {
             >
                 <div className="flex flex-col gap-y-8">
                     {staff.length === 0 ? (
-                        <p className="text-gray-500">No staff members available. Create staff first.</p>
+                        <p className="text-gray-500">No academic staff available. Add academic staff first.</p>
                     ) : (
                         <>
                             <FormControl fullWidth>

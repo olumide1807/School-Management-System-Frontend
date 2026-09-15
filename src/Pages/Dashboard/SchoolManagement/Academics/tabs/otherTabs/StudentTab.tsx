@@ -1,84 +1,62 @@
-import React from 'react'
-import BasicButton from '../../../../../../Components/Forms/BasicButton'
-import { SearchInput } from '../../../../../../Components/Forms'
-import TableComponent from '../../../../../../Components/Tables';
-import { Button } from '@mui/material';
+import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import BasicTable from '../../../../../../Components/Tables/BasicTable';
+import SERVER from '../../../../../../Utils/server';
+import Loader from '../../../../../loaders/Loader';
+import EmptyTable from '../../../../../../Components/EmptyTable';
 
 const StudentTab = () => {
+    const [searchParams] = useSearchParams();
+    const armId = searchParams.get('arm');
+
+    const { data: studentsData, isPending } = useQuery({
+        queryKey: ['class-students', armId],
+        queryFn: async () => {
+            const res = await SERVER.get(`student/class/${armId}`);
+            return res?.data;
+        },
+        enabled: !!armId,
+        retry: false,
+    });
+
+    const students = studentsData?.data || [];
 
     const headcells = [
-        {
-            key: "sn",
-            name: "S/N",
-        },
-        {
-            key: "name",
-            name: "Surname",
-        },
-        {
-            key: "firstname",
-            name: "First name",
-        },
-        {
-            key: "othername",
-            name: "Other name(s)",
-        },
-        {
-            key: "gender",
-            name: "Gender",
-        }
-    ]
+        { key: "sn", name: "S/N" },
+        { key: "surname", name: "Surname" },
+        { key: "firstname", name: "First name" },
+        { key: "othername", name: "Other name(s)" },
+        { key: "gender", name: "Gender" },
+    ];
 
-    const tableData = Array(5)
-        .fill("")
-        .map((_, i) => ({
-            sn: i + 1,
-            name: "James",
-            firstname: "Mujeeb",
-            othername: 'Adeola',
-            gender: 'M',
-            id: `row_${i}`,
+    const tableData = students.map((s: any, i: number) => ({
+        sn: i + 1,
+        surname: s.surName || '-',
+        firstname: s.firstName || '-',
+        othername: s.otherName || '-',
+        gender: s.gender === 'male' ? 'M' : s.gender === 'female' ? 'F' : '-',
     }));
 
-  return (
-    <div className='flex flex-col mt-3 w-full'>
-         <div className="flex justify-between items-center p-2 w-full">
-            <SearchInput
-                 className="md:w-full"
-				 otherClass="border border-[#ABABAB] gap-2 rounded-[5px] px-4 md:max-w-[420px]"
-            />
-
-            <Button
-                color="tertiary"
-                variant="contained"
-                // onClick={() => setOpenAddSubject(true)
-                sx={{
-                    color: "white",
-                    borderRadius: "10px",
-                    paddingY: "10px",
-                    paddingX: '13px',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    marginLeft: '13px'
-                }}
-
-            >
-                Download
-            </Button>
+    return (
+        <div className='flex flex-col gap-4 w-full mt-3'>
+            {isPending ? (
+                <Loader />
+            ) : students.length === 0 ? (
+                <EmptyTable
+                    message='No students in this class'
+                    text='Students appear here once admitted into this class'
+                    onClick={() => {}}
+                />
+            ) : (
+                <BasicTable
+                    headcells={headcells}
+                    tableData={tableData}
+                    onClick={() => {}}
+                    sideIcon={false}
+                />
+            )}
         </div>
-
-        <div className="">
-            <TableComponent
-                message='You have no student for this class'
-                headcells={headcells}
-                tableData={tableData}
-                // handleClick2={}
-                btn2Name='Add Student'
-            />
-        </div>
-
-    </div>
-  )
+    );
 }
 
 export default StudentTab;

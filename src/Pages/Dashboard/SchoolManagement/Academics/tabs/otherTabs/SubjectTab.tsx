@@ -30,6 +30,17 @@ const SubjectTab = () => {
 
     const armSubjects = armSubjectsData?.data || [];
 
+    // Fetch staff to resolve teacher names
+    const { data: staffData } = useQuery({
+        queryKey: ['all-staff'],
+        queryFn: async () => {
+            const res = await SERVER.get('staff');
+            return res?.data;
+        },
+    });
+
+    const allStaff = staffData?.data || [];
+
     // Get subject name from subject ID
     const getSubjectName = (subjectId: string) => {
         const subject = subjects.find((s: any) => s._id === subjectId);
@@ -43,10 +54,19 @@ const SubjectTab = () => {
         { key: "code", name: "Subject Code" },
     ];
 
+    // Get teacher name from staff ID
+    const getTeacherName = (teacherId: string) => {
+        if (!teacherId) return 'Not assigned';
+        const teacher = allStaff.find((s: any) => s._id === teacherId);
+        return teacher
+            ? `${teacher.firstName || ''} ${teacher.surname || teacher.lastName || ''}`.trim()
+            : 'Not assigned';
+    };
+
     const tableData = armSubjects.map((sp: any, i: number) => ({
         sn: i + 1,
         name: getSubjectName(sp.subjectId),
-        teacher: sp.subjectTeacherId || 'Not assigned',
+        teacher: getTeacherName(sp.subjectTeacherId),
         code: sp.subjectCode || '-',
     }));
 

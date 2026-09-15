@@ -7,6 +7,8 @@ import { useClassArms, useClassLevels, useSessionTerm } from "../../../../servic
 import { toast } from "react-toastify";
 import { toastOptions } from "../../../../Utils/toastOptions";
 import Loader from "../../../loaders/Loader";
+import usePermissions from "../../../../hooks/usePermissions";
+import useMyClasses from "../../../../hooks/useMyClasses";
 
 interface Student {
   _id: string;
@@ -114,13 +116,18 @@ function MarkAttendanceTab({
 
   const allArms = useClassArms();
   const allLevels = useClassLevels();
-  const classArms = allArms?.data?.data?.data || [];
+  const permissions = usePermissions();
+  const { myClasses } = useMyClasses();
+  const allClassArms = allArms?.data?.data?.data || [];
+  const classArms = permissions.canViewAllClasses ? allClassArms : myClasses;
   const classLevels = allLevels?.data?.data?.data || [];
 
   const isOnHoliday = sessionStatus !== "active";
   const isToday = isSameLocalDay(selectedDate, getTodayISO());
   // Class teacher can only edit today's records (super admin role: handled by backend)
-  const isLocked = !isToday;
+  const selectedDay = new Date(selectedDate).getDay();
+  const isWeekendDate = selectedDay === 0 || selectedDay === 6;
+  const isLocked = !isToday || isWeekendDate;
 
   const { data: studentsData, isPending: studentsPending } = useQuery({
     queryKey: ["students-in-class", selectedClassArmId],
@@ -145,6 +152,12 @@ function MarkAttendanceTab({
     retry: false,
   });
   const existingRecords: AttendanceRecord[] = attendanceData?.data || [];
+
+  useEffect(() => {
+    if (!selectedClassArmId && classArms.length === 1) {
+      setSelectedClassArmId(classArms[0]._id);
+    }
+  }, [classArms, selectedClassArmId]);
 
   // Initialise the map: existing records = their saved status, others = null (unmarked)
   useEffect(() => {
@@ -284,9 +297,9 @@ function MarkAttendanceTab({
           {activeTerm?.termName ? ` · ${activeTerm.termName}` : ""}
         </p>
         <div className="flex flex-wrap items-end gap-3">
-          <FormControl size="small" sx={{ minWidth: 220 }}>
-            <InputLabel>Class</InputLabel>
-            <Select
+          {classArms.length > 1 ? (
+            <FormControl size="small" sx={{ minWidth: 220 }}>
+              <Select
               value={selectedClassArmId} label="Class"
               onChange={(e) => setSelectedClassArmId(e.target.value)}
               sx={{ borderRadius: "10px", backgroundColor: "white" }}
@@ -296,6 +309,14 @@ function MarkAttendanceTab({
               ))}
             </Select>
           </FormControl>
+          ) : classArms.length === 1 ? (
+            <div className="flex flex-col">
+              <label className="text-xs text-gray-600 mb-1">Class</label>
+              <p className="text-sm font-medium text-secondary py-2">
+                {getArmLabel(classArms[0]._id)}
+              </p>
+            </div>
+          ) : null}
 
           <div className="flex flex-col">
             <label className="text-xs text-gray-600 mb-1">Date</label>
@@ -321,8 +342,17 @@ function MarkAttendanceTab({
         </div>
       ) : (
         <>
+
+          {isWeekendDate && (
+            <div className="mb-4 bg-gray-100 border border-gray-300 rounded-lg px-4 py-3">
+              <p className="text-sm text-gray-700 font-medium">
+                {new Date(selectedDate).toLocaleDateString("en-GB", { weekday: "long" })} isn't a school day.
+              </p>
+            </div>
+          )}
+
           {/* Lock notice for past dates */}
-          {isLocked && (
+          {isLocked && !isWeekendDate && (
             <div className="mb-4 bg-gray-100 border border-gray-300 rounded-lg px-4 py-3 flex items-start gap-3">
               <Lock fontSize="small" className="text-gray-600 mt-0.5" />
               <div className="text-sm text-gray-700">
@@ -334,6 +364,8 @@ function MarkAttendanceTab({
               </div>
             </div>
           )}
+
+          
 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -505,8 +537,17 @@ function ViewRecordsTab({ activeSession, activeTerm }: any) {
 
   const allArms = useClassArms();
   const allLevels = useClassLevels();
-  const classArms = allArms?.data?.data?.data || [];
+  const permissions = usePermissions();
+  const { myClasses } = useMyClasses();
+  const allClassArms = allArms?.data?.data?.data || [];
+  const classArms = permissions.canViewAllClasses ? allClassArms : myClasses;
   const classLevels = allLevels?.data?.data?.data || [];
+
+  useEffect(() => {
+    if (!selectedClassArmId && classArms.length === 1) {
+      setSelectedClassArmId(classArms[0]._id);
+    }
+  }, [classArms, selectedClassArmId]);
 
   const { data: studentsData } = useQuery({
     queryKey: ["students-in-class-records", selectedClassArmId],
@@ -571,18 +612,26 @@ function ViewRecordsTab({ activeSession, activeTerm }: any) {
           {activeTerm?.termName ? ` · ${activeTerm.termName}` : ""}
         </p>
         <div className="flex flex-wrap items-end gap-3">
-          <FormControl size="small" sx={{ minWidth: 220 }}>
-            <InputLabel>Class</InputLabel>
-            <Select
-              value={selectedClassArmId} label="Class"
-              onChange={(e) => setSelectedClassArmId(e.target.value)}
-              sx={{ borderRadius: "10px", backgroundColor: "white" }}
-            >
-              {classArms.map((arm: any) => (
-                <MenuItem key={arm._id} value={arm._id}>{getArmLabel(arm._id)}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          {classArms.length > 1 ? (
+            <FormControl size="small" sx={{ minWidth: 220 }}>
+              <Select
+                value={selectedClassArmId} label="Class"
+                onChange={(e) => setSelectedClassArmId(e.target.value)}
+                sx={{ borderRadius: "10px", backgroundColor: "white" }}
+              >
+                {classArms.map((arm: any) => (
+                  <MenuItem key={arm._id} value={arm._id}>{getArmLabel(arm._id)}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          ) : classArms.length === 1 ? (
+            <div className="flex flex-col">
+              <label className="text-xs text-gray-600 mb-1">Class</label>
+              <p className="text-sm font-medium text-secondary py-2">
+                {getArmLabel(classArms[0]._id)}
+              </p>
+            </div>
+          ) : null}
 
           <div className="flex flex-col">
             <label className="text-xs text-gray-600 mb-1">From</label>
@@ -605,7 +654,11 @@ function ViewRecordsTab({ activeSession, activeTerm }: any) {
 
       {!selectedClassArmId ? (
         <div className="text-center py-20 border border-gray-200 rounded-xl">
-          <p className="text-gray-500">Select a class to view its attendance records</p>
+          <p className="text-gray-500">
+            {classArms.length === 0
+              ? "You aren't the form teacher of any class, so there's no register for you to take."
+              : "Select a class to start marking attendance"}
+          </p>
         </div>
       ) : isPending ? (
         <Loader />

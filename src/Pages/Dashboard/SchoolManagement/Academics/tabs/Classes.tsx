@@ -87,6 +87,24 @@ export default function Classes() {
   const subjectCounts = subjectCountsData || {};
   const studentCounts = studentCountsData || {};
 
+    const { data: staffData } = useQuery({
+    queryKey: ['all-staff'],
+    queryFn: async () => {
+      const res = await SERVER.get('staff');
+      return res?.data;
+    },
+  });
+
+  const allStaff = staffData?.data || [];
+
+  const getTeacherName = (teacherId: string) => {
+    if (!teacherId) return 'Not assigned';
+    const teacher = allStaff.find((s: any) => s._id === teacherId);
+    return teacher
+      ? `${teacher.firstName || ''} ${teacher.surname || teacher.lastName || ''}`.trim()
+      : 'Not assigned';
+  };
+
   // Build filter options from actual data
   const levelFilterOptions = [
     { label: "All levels", value: "All levels" },
@@ -114,7 +132,7 @@ export default function Classes() {
         name: `${level?.levelShortName || ''} ${armNameUpper}`.trim(),
         levelShortName: level?.levelShortName || '',
         armName: armNameUpper,
-        teacher: arm.assignedTeacher || "Not assigned",
+        teacher: getTeacherName(arm.assignedTeacher),
         subject: subjectCounts[arm._id] ?? "0",
         students: studentCounts[arm._id] ?? "0",
         actions: '',

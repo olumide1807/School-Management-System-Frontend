@@ -6,6 +6,8 @@ import SubjectTab from '../otherTabs/SubjectTab';
 import StudentTab from '../otherTabs/StudentTab';
 import AssignTeacherModal from '../../Modals/AssignTeacherModal';
 import DeleteClassLevelModal from '../../Modals/DeleteClassLevelModal';
+import { useQuery } from '@tanstack/react-query';
+import SERVER from '../../../../../../Utils/server';
 
 
 const ViewClassLevel = () => {
@@ -29,6 +31,33 @@ const ViewClassLevel = () => {
         setSubjectTab(true);
     }
 
+    const { data: armData } = useQuery({
+        queryKey: ['class-arm', armId],
+        queryFn: async () => {
+            const res = await SERVER.get(`class/arm/${armId}`);
+            return res?.data;
+        },
+        enabled: !!armId,
+    });
+
+    const { data: staffData } = useQuery({
+        queryKey: ['all-staff'],
+        queryFn: async () => {
+            const res = await SERVER.get('staff');
+            return res?.data;
+        },
+    });
+
+    const arm = armData?.data;
+    const allStaff = staffData?.data || [];
+
+    const classTeacher = arm?.assignedTeacher
+        ? allStaff.find((s: any) => s._id === arm.assignedTeacher)
+        : null;
+    const classTeacherName = classTeacher
+        ? `${classTeacher.firstName || ''} ${classTeacher.surname || classTeacher.lastName || ''}`.trim()
+        : 'Not assigned';
+
 
   return (
     <div className="flex flex-col">
@@ -48,7 +77,7 @@ const ViewClassLevel = () => {
                 <div className="flex flex-col gap-6 md:flex-row items-center justify-between">
                     <section className="flex md:items-center gap-4">
                         <span className='text-[14px] text-[#000]'>Class Teacher:</span>
-                        <strong className='text-[14px] text-[#000]'>Not assigned</strong>
+                        <strong className='text-[14px] text-[#000]'>{classTeacherName}</strong>
                     </section>
 
                     <section className="flex items-center gap-4">
@@ -104,6 +133,9 @@ const ViewClassLevel = () => {
         <AssignTeacherModal
             openModal={assignTeacher}
             closeModal={() => setAssignTeacher(false)}
+            classArmId={armId}
+            currentTeacherId={arm?.assignedTeacher || ""}
+            className={className}
         />
         
         <DeleteClassLevelModal
