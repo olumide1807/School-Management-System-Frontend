@@ -40,21 +40,56 @@
   .horizontal-scroll::-webkit-scrollbar {
     height: 0px;
   }
+
   .horizontal-scroll::-webkit-scrollbar:hover {
     height: 3px;
   }
+
   ::-webkit-scrollbar {
     width: 6px;
   }
+
   ::-webkit-scrollbar-track {
     border-radius: 10px;
     background: whitesmoke;
   }
+
   ::-webkit-scrollbar-thumb {
     background-color: rgb(221, 219, 219);
     border-radius: 10px;
   }
+
   ::-webkit-scrollbar-thumb:hover {
     background-color: rgb(193, 193, 193);
+  }
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #print-area,
+  #print-area * {
+    visibility: visible;
+  }
+
+  #print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  .report-page {
+    break-after: page;
+  }
+
+  .report-page:last-child {
+    break-after: auto;
   }
 }

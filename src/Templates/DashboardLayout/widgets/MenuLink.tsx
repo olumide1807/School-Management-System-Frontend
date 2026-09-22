@@ -27,6 +27,7 @@ const AdminMenuLinks: MenuItem[] = [
       { name: "Fee Management", link: "fee-management" },
       { name: "Inventory", link: "inventory" },
       { name: "Attendance", link: "attendance" },
+      { name: "Results", link: "results" },
     ],
   },
   { icon: <StaffMgtMenuIcon />, name: "Staff Management", link: "staff-management" },
@@ -43,6 +44,7 @@ const TeacherMenuLinks: MenuItem[] = [
   { icon: <StaffMgtMenuIcon />, name: "My profile", link: "my-profile" },
   { icon: <SupportIcon />, name: "Support", link: "support" },
   { icon: <SchMgtMenuIcon />, name: "Grading", link: "grading" },
+  { icon: <SchMgtMenuIcon />, name: "Results", link: "school-management/results" },
 ];
 
 // Non-academic staff — own record only, until we define more

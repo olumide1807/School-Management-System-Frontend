@@ -93,7 +93,10 @@ export default function TeacherDashboard() {
 
   // ---------- Teaching contexts: one row per arm, roles merged ----------
   const contexts = useMemo(() => {
-    const byArm: Record<string, { armId: string; isForm: boolean; subjects: string[] }> = {};
+    const byArm: Record<
+      string,
+      { armId: string; isForm: boolean; subjects: string[] }
+    > = {};
 
     myClasses.forEach((arm: any) => {
       byArm[arm._id] = { armId: arm._id, isForm: true, subjects: [] };
@@ -102,7 +105,11 @@ export default function TeacherDashboard() {
     mySubjects.forEach((sp: any) => {
       if (!sp.classArmId) return;
       if (!byArm[sp.classArmId]) {
-        byArm[sp.classArmId] = { armId: sp.classArmId, isForm: false, subjects: [] };
+        byArm[sp.classArmId] = {
+          armId: sp.classArmId,
+          isForm: false,
+          subjects: [],
+        };
       }
       const name = subjectName(sp.subjectId);
       if (!byArm[sp.classArmId].subjects.includes(name)) {
@@ -123,10 +130,13 @@ export default function TeacherDashboard() {
     if (now < start) return { state: "upcoming" as const, start, end };
     if (now > end) return { state: "ended" as const, start, end };
 
-    const totalWeeks = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / msWeek));
+    const totalWeeks = Math.max(
+      1,
+      Math.ceil((end.getTime() - start.getTime()) / msWeek),
+    );
     const currentWeek = Math.min(
       totalWeeks,
-      Math.max(1, Math.ceil((now.getTime() - start.getTime()) / msWeek))
+      Math.max(1, Math.ceil((now.getTime() - start.getTime()) / msWeek)),
     );
     return { state: "active" as const, currentWeek, totalWeeks, end };
   }, [activeTerm]);
@@ -136,7 +146,7 @@ export default function TeacherDashboard() {
     queryKey: ["class-attendance", formClass?._id, date],
     queryFn: async () => {
       const res = await SERVER.get(
-        `attendance?classArmId=${formClass._id}&date=${date}`
+        `attendance?classArmId=${formClass._id}&date=${date}`,
       );
       return res?.data;
     },
@@ -158,7 +168,7 @@ export default function TeacherDashboard() {
 
   const registerTaken = todayRecords.length > 0;
 
-    const absentToday = useMemo(() => {
+  const absentToday = useMemo(() => {
     const absentIds = todayRecords
       .filter((r: any) => r.status === "absent")
       .map((r: any) => String(r.studentId));
@@ -170,7 +180,7 @@ export default function TeacherDashboard() {
     queryKey: ["class-attendance-week", formClass?._id, weekStartISO()],
     queryFn: async () => {
       const res = await SERVER.get(
-        `attendance?classArmId=${formClass._id}&startDate=${weekStartISO()}&endDate=${date}`
+        `attendance?classArmId=${formClass._id}&startDate=${weekStartISO()}&endDate=${date}`,
       );
       return res?.data;
     },
@@ -182,7 +192,8 @@ export default function TeacherDashboard() {
     weekRecords.length > 0
       ? Math.round(
           (weekRecords.filter((r: any) => r.status === "present").length /
-            weekRecords.length) * 100
+            weekRecords.length) *
+            100,
         )
       : null;
 
@@ -197,7 +208,7 @@ export default function TeacherDashboard() {
   });
   const settings = settingsData?.data;
 
-    const { data: announcementsData } = useQuery({
+  const { data: announcementsData } = useQuery({
     queryKey: ["announcements-available"],
     queryFn: async () => {
       const res = await SERVER.get("announcement?type=available");
@@ -207,16 +218,32 @@ export default function TeacherDashboard() {
   });
   const announcements = (announcementsData?.data || []).slice(0, 3);
 
+  const { data: dayCheck } = useQuery({
+    queryKey: ["school-day", date],
+    queryFn: async () => {
+      const res = await SERVER.get(`calendar/check?date=${date}`);
+      return res?.data?.data;
+    },
+    retry: false,
+  });
+  const closure = dayCheck?.closure || null;
+
   // Rebuild the period sequence the same way the Timetable builder does
   const periodSlots = useMemo(() => {
     if (!settings?.startTime || !settings?.endTime) return [];
-    const slots: { index: number; label: string; start: number; end: number; isBreak: boolean }[] = [];
+    const slots: {
+      index: number;
+      label: string;
+      start: number;
+      end: number;
+      isBreak: boolean;
+    }[] = [];
     const schoolStart = toMinutes(settings.startTime);
     const schoolEnd = toMinutes(settings.endTime);
     const dur = settings.periodDuration || 40;
 
     const breaks = [...(settings.breaks || [])].sort(
-      (a: any, b: any) => toMinutes(a.startTime) - toMinutes(b.startTime)
+      (a: any, b: any) => toMinutes(a.startTime) - toMinutes(b.startTime),
     );
 
     let cursor = schoolStart;
@@ -233,13 +260,31 @@ export default function TeacherDashboard() {
         const bStart = toMinutes(nextBreak.startTime);
         const bEnd = toMinutes(nextBreak.endTime);
         if (bStart > cursor) {
-          slots.push({ index: idx++, label: `Period ${periodNum++}`, start: cursor, end: bStart, isBreak: false });
+          slots.push({
+            index: idx++,
+            label: `Period ${periodNum++}`,
+            start: cursor,
+            end: bStart,
+            isBreak: false,
+          });
         }
-        slots.push({ index: idx++, label: nextBreak.name, start: bStart, end: bEnd, isBreak: true });
+        slots.push({
+          index: idx++,
+          label: nextBreak.name,
+          start: bStart,
+          end: bEnd,
+          isBreak: true,
+        });
         cursor = bEnd;
       } else {
         const end = Math.min(cursor + dur, schoolEnd);
-        slots.push({ index: idx++, label: `Period ${periodNum++}`, start: cursor, end, isBreak: false });
+        slots.push({
+          index: idx++,
+          label: `Period ${periodNum++}`,
+          start: cursor,
+          end,
+          isBreak: false,
+        });
         cursor = end;
       }
     }
@@ -262,11 +307,19 @@ export default function TeacherDashboard() {
 
   // Which subjects does this teacher own in a given arm?
   const mySubjectIdsInArm = (armId: string) =>
-    mySubjects.filter((sp: any) => sp.classArmId === armId).map((sp: any) => sp.subjectId);
+    mySubjects
+      .filter((sp: any) => sp.classArmId === armId)
+      .map((sp: any) => sp.subjectId);
 
   const todaysPeriods = useMemo(() => {
     const day = displayDay;
-    const out: { start: number; end: number; label: string; subject: string; arm: string }[] = [];
+    const out: {
+      start: number;
+      end: number;
+      label: string;
+      subject: string;
+      arm: string;
+    }[] = [];
 
     gridQueries.forEach((q) => {
       const result: any = q.data;
@@ -288,7 +341,13 @@ export default function TeacherDashboard() {
     });
 
     return out.sort((a, b) => a.start - b.start);
-  }, [gridQueries.map((q) => q.dataUpdatedAt).join(","), periodSlots, mySubjects, allArms, displayDay]);
+  }, [
+    gridQueries.map((q) => q.dataUpdatedAt).join(","),
+    periodSlots,
+    mySubjects,
+    allArms,
+    displayDay,
+  ]);
 
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
   const gridsLoading = gridQueries.some((q) => q.isPending);
@@ -312,13 +371,21 @@ export default function TeacherDashboard() {
           </p>
           {termProgress?.state === "active" && (
             <p className="mt-1 text-xs text-text-ter">
-              Week {termProgress.currentWeek} of {termProgress.totalWeeks} · term ends{" "}
-              {termProgress.end.toLocaleDateString("en-GB", { day: "numeric", month: "long" })}
+              Week {termProgress.currentWeek} of {termProgress.totalWeeks} ·
+              term ends{" "}
+              {termProgress.end.toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "long",
+              })}
             </p>
           )}
           {termProgress?.state === "ended" && (
             <p className="mt-1 text-xs text-text-ter">
-              Term ended {termProgress.end.toLocaleDateString("en-GB", { day: "numeric", month: "long" })}
+              Term ended{" "}
+              {termProgress.end.toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "long",
+              })}
             </p>
           )}
         </div>
@@ -341,9 +408,21 @@ export default function TeacherDashboard() {
         </div>
       )}
 
+      {closure && (
+        <div className="rounded-[12px] border border-[#DEE0E0] px-5 py-4">
+          <p className="text-[15px] font-medium text-secondary">
+            No school today
+          </p>
+          <p className="text-[13px] text-text-ter mt-0.5">{closure.name}</p>
+        </div>
+      )}
+
       {/* ---------- Register prompt ---------- */}
-      {formClass && !weekend && sessionStatus !== "holiday" && (
-        registerTaken ? (
+      {formClass &&
+        !weekend &&
+        !closure &&
+        sessionStatus !== "holiday" &&
+        (registerTaken ? (
           <div className="rounded-[12px] border border-[#DEE0E0] px-5 py-4">
             <p className="text-[15px] font-medium text-secondary">
               Register taken for {armLabel(formClass._id)}
@@ -361,7 +440,11 @@ export default function TeacherDashboard() {
                   {absentToday.map((s: any) => (
                     <li key={s._id}>
                       <button
-                        onClick={() => navigate(`/student-management/student-profile/${s._id}`)}
+                        onClick={() =>
+                          navigate(
+                            `/student-management/student-profile/${s._id}`,
+                          )
+                        }
                         className="text-[13px] px-3 py-1.5 rounded-[8px] bg-[#FAEEDA] text-[#854F0B] hover:underline"
                       >
                         {`${s.firstName || ""} ${s.surName || ""}`.trim()}
@@ -379,7 +462,8 @@ export default function TeacherDashboard() {
                 Register not taken
               </p>
               <p className="text-[13px] text-[#854F0B] mt-0.5">
-                {students.length} {students.length === 1 ? "student" : "students"} in{" "}
+                {students.length}{" "}
+                {students.length === 1 ? "student" : "students"} in{" "}
                 {armLabel(formClass._id)} · you can only mark today's attendance
               </p>
             </div>
@@ -390,8 +474,7 @@ export default function TeacherDashboard() {
               Take register
             </button>
           </div>
-        )
-      )}
+        ))}
 
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* ---------- Today's periods ---------- */}
@@ -407,13 +490,14 @@ export default function TeacherDashboard() {
               {periodSlots.length === 0
                 ? "School hours haven't been set up yet, so periods can't be shown."
                 : weekend
-                ? "Nothing timetabled for you on Monday."
-                : "Nothing timetabled for you today."}
+                  ? "Nothing timetabled for you on Monday."
+                  : "Nothing timetabled for you today."}
             </p>
           ) : (
             <ul>
               {todaysPeriods.map((p, i) => {
-                const isNow = !weekend && nowMinutes >= p.start && nowMinutes < p.end;
+                const isNow =
+                  !weekend && nowMinutes >= p.start && nowMinutes < p.end;
                 const isPast = !weekend && nowMinutes >= p.end;
                 return (
                   <li
@@ -424,7 +508,11 @@ export default function TeacherDashboard() {
                   >
                     <span
                       className={`w-[70px] shrink-0 text-[13px] tabular-nums ${
-                        isNow ? "text-tertiary font-medium" : isPast ? "text-text-ter" : "text-text-sec"
+                        isNow
+                          ? "text-tertiary font-medium"
+                          : isPast
+                            ? "text-text-ter"
+                            : "text-text-sec"
                       }`}
                     >
                       {minutesToLabel(p.start)}
@@ -432,7 +520,11 @@ export default function TeacherDashboard() {
                     <div className="min-w-0">
                       <p
                         className={`text-sm ${
-                          isNow ? "text-tertiary font-medium" : isPast ? "text-text-ter" : "text-text-pry"
+                          isNow
+                            ? "text-tertiary font-medium"
+                            : isPast
+                              ? "text-text-ter"
+                              : "text-text-pry"
                         }`}
                       >
                         {p.subject} · {p.arm}
@@ -459,7 +551,9 @@ export default function TeacherDashboard() {
               </p>
               {weekRate === null ? (
                 <>
-                  <p className="text-[32px] leading-none font-bold text-[#B6C2C7] tabular-nums mt-2">—</p>
+                  <p className="text-[32px] leading-none font-bold text-[#B6C2C7] tabular-nums mt-2">
+                    —
+                  </p>
                   <p className="text-xs text-text-ter mt-1">
                     No attendance recorded yet this week
                   </p>
@@ -469,7 +563,9 @@ export default function TeacherDashboard() {
                   <p className="text-[32px] leading-none font-bold text-tertiary tabular-nums mt-2">
                     {weekRate}%
                   </p>
-                  <p className="text-xs text-text-ter mt-1">average attendance</p>
+                  <p className="text-xs text-text-ter mt-1">
+                    average attendance
+                  </p>
                 </>
               )}
             </div>
@@ -512,14 +608,23 @@ export default function TeacherDashboard() {
               From the school
             </h2>
             {announcements.length === 0 ? (
-              <p className="text-sm text-text-ter">No announcements right now.</p>
+              <p className="text-sm text-text-ter">
+                No announcements right now.
+              </p>
             ) : (
               <ul className="flex flex-col gap-3">
                 {announcements.map((a: any) => (
-                  <li key={a._id} className="border-b border-[#EFF5F8] last:border-b-0 pb-3 last:pb-0">
+                  <li
+                    key={a._id}
+                    className="border-b border-[#EFF5F8] last:border-b-0 pb-3 last:pb-0"
+                  >
                     <p className="text-sm text-text-pry">{a.title}</p>
                     <p className="text-xs text-text-ter mt-0.5">
-                      Until {new Date(a.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                      Until{" "}
+                      {new Date(a.endDate).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                      })}
                     </p>
                   </li>
                 ))}

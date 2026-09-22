@@ -12,6 +12,7 @@ import SubjectDetail from "./tabs/SubjectDetail";
 import { useDispatch, useSelector } from "react-redux";
 import { setSlide } from "../../../../redux/slice/academicSlides";
 import AssessmentFormat from "./tabs/AssessmentFormat";
+import SchoolCalendar from "./tabs/SchoolCalendar";
 
 export default function Academics() {
   const dispatch = useDispatch();
@@ -23,6 +24,7 @@ export default function Academics() {
     4: <Timetable />,
     5: <GradingSystem />,
     6: <AssessmentFormat />,
+    7: <SchoolCalendar />,
   };
 
   const [searchParams] = useSearchParams();
@@ -41,7 +43,7 @@ export default function Academics() {
   return (
     <div>
       <div className="mb-[22px]">
-        <div className="flex items-center justify-between w-full">
+        <div className="flex items-center justify-between w-full overflow-x-auto">
           {steps.map((step) => (
             <button
               key={step.id}
@@ -85,5 +87,9 @@ const steps = [
   {
     id: 6,
     name: "Assessment Format",
+  },
+  {
+    id: 7,
+    name: "School Calendar",
   }
 ];

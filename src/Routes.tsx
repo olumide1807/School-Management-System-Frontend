@@ -18,6 +18,7 @@ import Support from "./Pages/Support";
 import ClassLevel from "./Pages/Dashboard/SchoolManagement/Academics/tabs/tab2/ClassLevel";
 import View from "./Pages/Dashboard/SchoolManagement/Academics/tabs/tab2/View";
 import ViewClassLevel from "./Pages/Dashboard/SchoolManagement/Academics/tabs/tab2/ViewClassLevel";
+import Results from "./Pages/Dashboard/Results";
 
 import { useDispatch, useSelector } from "react-redux";
 import DashboardLayout from "./Templates/DashboardLayout/index";
@@ -180,6 +181,7 @@ function AllRoutes() {
           <Route path="attendance" element={permissions.canAccessAttendance ? <Attendance /> : <Navigate to="/" />} />
           <Route path="admission" element={permissions.canAccessAdmission ? <Admissions /> : <Navigate to="/" />} />
           <Route path="fee-management" element={permissions.canAccessFeeManagement ? <FeeManagement /> : <Navigate to="/" />} />
+          <Route path="results" element={permissions.canAccessAcademics ? <Results /> : <Navigate to="/" />} />
           <Route path="inventory" element={permissions.canAccessInventory ? <Inventory /> : <Navigate to="/" />} />
         </Route>
         <Route path="student-management">

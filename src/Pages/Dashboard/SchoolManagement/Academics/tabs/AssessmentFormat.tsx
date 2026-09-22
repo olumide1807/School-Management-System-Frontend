@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Button from "@mui/material/Button";
-import { Add, Edit } from "@mui/icons-material";
+import { Add, Edit, EventAvailable } from "@mui/icons-material";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
@@ -10,40 +10,43 @@ import { toastOptions } from "../../../../../Utils/toastOptions";
 import { useClassLevels } from "../../../../../services/api-call";
 import Loader from "../../../../loaders/Loader";
 
+type Source = "manual" | "attendance";
+type Row = { name: string; maxScore: number; order: number; source: Source };
+
 // Common Nigerian structures. Each must total 100.
-const PRESETS = {
+const PRESETS: Record<string, { label: string; hint: string; assessments: Row[] }> = {
   standard: {
     label: "Two CAs + Exam",
     hint: "The most common structure",
     assessments: [
-      { name: "CA 1", maxScore: 20, order: 1 },
-      { name: "CA 2", maxScore: 20, order: 2 },
-      { name: "Exam", maxScore: 60, order: 3 },
+      { name: "CA 1", maxScore: 20, order: 1, source: "manual" },
+      { name: "CA 2", maxScore: 20, order: 2, source: "manual" },
+      { name: "Exam", maxScore: 60, order: 3, source: "manual" },
     ],
   },
   threeCA: {
     label: "Three CAs + Exam",
     hint: "More continuous assessment, common in primary",
     assessments: [
-      { name: "CA 1", maxScore: 10, order: 1 },
-      { name: "CA 2", maxScore: 10, order: 2 },
-      { name: "CA 3", maxScore: 20, order: 3 },
-      { name: "Exam", maxScore: 60, order: 4 },
+      { name: "CA 1", maxScore: 10, order: 1, source: "manual" },
+      { name: "CA 2", maxScore: 10, order: 2, source: "manual" },
+      { name: "CA 3", maxScore: 20, order: 3, source: "manual" },
+      { name: "Exam", maxScore: 60, order: 4, source: "manual" },
     ],
   },
-  projectBased: {
-    label: "CAs + Project + Exam",
-    hint: "Where project work carries marks",
+  withAttendance: {
+    label: "Attendance + two CAs + Exam",
+    hint: "Attendance marks computed automatically from the register",
     assessments: [
-      { name: "CA 1", maxScore: 15, order: 1 },
-      { name: "CA 2", maxScore: 15, order: 2 },
-      { name: "Project", maxScore: 20, order: 3 },
-      { name: "Exam", maxScore: 50, order: 4 },
+      { name: "Attendance", maxScore: 5, order: 1, source: "attendance" },
+      { name: "CA 1", maxScore: 15, order: 2, source: "manual" },
+      { name: "CA 2", maxScore: 20, order: 3, source: "manual" },
+      { name: "Exam", maxScore: 60, order: 4, source: "manual" },
     ],
   },
 };
 
-type Row = { name: string; maxScore: number; order: number };
+const blankRow = (): Row => ({ name: "", maxScore: 0, order: 1, source: "manual" });
 
 export default function AssessmentFormat() {
   const queryClient = useQueryClient();
@@ -51,7 +54,7 @@ export default function AssessmentFormat() {
   const [openModal, setOpenModal] = useState(false);
   const [activeLevel, setActiveLevel] = useState<any>(null);
   const [mode, setMode] = useState<"choose" | "custom">("choose");
-  const [rows, setRows] = useState<Row[]>([{ name: "", maxScore: 0, order: 1 }]);
+  const [rows, setRows] = useState<Row[]>([blankRow()]);
   const [saving, setSaving] = useState(false);
 
   const levelsData = useClassLevels();
@@ -72,19 +75,26 @@ export default function AssessmentFormat() {
 
   const total = rows.reduce((sum, r) => sum + (Number(r.maxScore) || 0), 0);
   const totalIsValid = total === 100;
+  const hasAttendance = rows.some((r) => r.source === "attendance");
 
   const openFor = (level: any) => {
     const existing = formatFor(level._id);
     setActiveLevel(level);
     if (existing) {
-        setRows(
-            existing.assessments
-            .map((a: any) => ({ name: a.name, maxScore: a.maxScore, order: a.order }))
-            .sort((a: Row, b: Row) => (a.order || 0) - (b.order || 0))
-        );
-        setMode("custom");
+      // Fresh objects — never mutate the cached query data
+      setRows(
+        existing.assessments
+          .map((a: any) => ({
+            name: a.name,
+            maxScore: a.maxScore,
+            order: a.order,
+            source: (a.source || "manual") as Source,
+          }))
+          .sort((a: Row, b: Row) => (a.order || 0) - (b.order || 0))
+      );
+      setMode("custom");
     } else {
-      setRows([{ name: "", maxScore: 0, order: 1 }]);
+      setRows([blankRow()]);
       setMode("choose");
     }
     setOpenModal(true);
@@ -94,7 +104,7 @@ export default function AssessmentFormat() {
     setOpenModal(false);
     setActiveLevel(null);
     setMode("choose");
-    setRows([{ name: "", maxScore: 0, order: 1 }]);
+    setRows([blankRow()]);
   };
 
   const save = async (assessments: Row[]) => {
@@ -117,6 +127,7 @@ export default function AssessmentFormat() {
         name: a.name.trim(),
         maxScore: Number(a.maxScore),
         order: i + 1,
+        source: a.source || "manual",
       }));
 
       if (existing) {
@@ -142,14 +153,27 @@ export default function AssessmentFormat() {
   };
 
   const updateRow = (i: number, field: "name" | "maxScore", value: string) => {
-    const updated = [...rows];
-    if (field === "maxScore") updated[i].maxScore = Number(value);
-    else updated[i].name = value;
-    setRows(updated);
+    setRows((prev) =>
+      prev.map((r, idx) =>
+        idx !== i
+          ? r
+          : field === "maxScore"
+          ? { ...r, maxScore: Number(value) }
+          : { ...r, name: value }
+      )
+    );
   };
 
-  const addRow = () => setRows([...rows, { name: "", maxScore: 0, order: rows.length + 1 }]);
-  const removeRow = (i: number) => setRows(rows.filter((_, idx) => idx !== i));
+  const addRow = () => setRows((prev) => [...prev, { ...blankRow(), order: prev.length + 1 }]);
+
+  // Attendance goes first, conventionally
+  const addAttendanceRow = () =>
+    setRows((prev) => [
+      { name: "Attendance", maxScore: 0, order: 0, source: "attendance" },
+      ...prev,
+    ]);
+
+  const removeRow = (i: number) => setRows((prev) => prev.filter((_, idx) => idx !== i));
 
   if (isPending) return <Loader />;
 
@@ -175,10 +199,7 @@ export default function AssessmentFormat() {
             {classLevels.map((level: any) => {
               const format = formatFor(level._id);
               return (
-                <div
-                  key={level._id}
-                  className="border border-gray-200 rounded-xl p-5"
-                >
+                <div key={level._id} className="border border-gray-200 rounded-xl p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div>
                       <h3 className="font-semibold text-black">{level.levelName}</h3>
@@ -210,8 +231,11 @@ export default function AssessmentFormat() {
                         .map((a: any, i: number) => (
                           <div
                             key={i}
-                            className="flex items-baseline gap-2 border border-gray-200 rounded-lg px-3 py-2"
+                            className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2"
                           >
+                            {a.source === "attendance" && (
+                              <EventAvailable sx={{ fontSize: 15 }} className="text-tertiary" />
+                            )}
                             <span className="text-sm text-black">{a.name}</span>
                             <span className="text-xs text-tertiary tabular-nums">
                               {a.maxScore}
@@ -285,43 +309,79 @@ export default function AssessmentFormat() {
             )}
 
             <div className="flex flex-col gap-3">
-              {rows.map((row, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    placeholder="Assessment name"
-                    value={row.name}
-                    onChange={(e) => updateRow(i, "name", e.target.value)}
-                    className="flex-1 border border-gray-300 rounded-lg p-2.5 text-sm"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Marks"
-                    value={row.maxScore || ""}
-                    onChange={(e) => updateRow(i, "maxScore", e.target.value)}
-                    className="w-24 border border-gray-300 rounded-lg p-2.5 text-sm tabular-nums"
-                  />
-                  {rows.length > 1 && (
-                    <button
-                      onClick={() => removeRow(i)}
-                      className="text-red-500 text-sm w-6 shrink-0"
-                      aria-label={`Remove ${row.name || "assessment"}`}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              ))}
+              {rows.map((row, i) => {
+                const isAttendance = row.source === "attendance";
+                return (
+                  <div key={i} className="flex flex-col gap-1">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 relative">
+                        <input
+                          type="text"
+                          placeholder="Assessment name"
+                          value={row.name}
+                          onChange={(e) => updateRow(i, "name", e.target.value)}
+                          className={`w-full border rounded-lg p-2.5 text-sm ${
+                            isAttendance
+                              ? "border-tertiary bg-[#f0f9fc] pl-9"
+                              : "border-gray-300"
+                          }`}
+                        />
+                        {isAttendance && (
+                          <EventAvailable
+                            sx={{ fontSize: 17 }}
+                            className="text-tertiary absolute left-2.5 top-1/2 -translate-y-1/2"
+                          />
+                        )}
+                      </div>
+                      <input
+                        type="number"
+                        placeholder="Marks"
+                        value={row.maxScore || ""}
+                        onChange={(e) => updateRow(i, "maxScore", e.target.value)}
+                        className="w-24 border border-gray-300 rounded-lg p-2.5 text-sm tabular-nums"
+                      />
+                      {rows.length > 1 && (
+                        <button
+                          onClick={() => removeRow(i)}
+                          className="text-red-500 text-sm w-6 shrink-0"
+                          aria-label={`Remove ${row.name || "assessment"}`}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    {isAttendance && (
+                      <p className="text-xs text-tertiary pl-1">
+                        Computed from the register — days present ÷ days recorded × marks.
+                        Teachers don't enter it.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
 
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<Add />}
-                onClick={addRow}
-                sx={{ width: "fit-content", borderRadius: "8px", textTransform: "capitalize", mt: 1 }}
-              >
-                Add assessment
-              </Button>
+              <div className="flex flex-wrap gap-2 mt-1">
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<Add />}
+                  onClick={addRow}
+                  sx={{ borderRadius: "8px", textTransform: "capitalize" }}
+                >
+                  Add assessment
+                </Button>
+                {!hasAttendance && (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<EventAvailable />}
+                    onClick={addAttendanceRow}
+                    sx={{ borderRadius: "8px", textTransform: "capitalize" }}
+                  >
+                    Include attendance
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div
@@ -331,9 +391,7 @@ export default function AssessmentFormat() {
                   : "bg-yellow-50 border border-yellow-200"
               }`}
             >
-              <span
-                className={`text-sm ${totalIsValid ? "text-green-800" : "text-yellow-800"}`}
-              >
+              <span className={`text-sm ${totalIsValid ? "text-green-800" : "text-yellow-800"}`}>
                 {totalIsValid
                   ? "Adds up to 100"
                   : total > 100

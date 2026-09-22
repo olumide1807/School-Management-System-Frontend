@@ -1,5 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
-import { Button, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
+import {
+  Button,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+} from "@mui/material";
+import { EventAvailable } from "@mui/icons-material";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
@@ -15,18 +22,8 @@ type Marks = Record<string, Record<string, string>>; // studentId -> assessmentN
 export default function Grading() {
   const queryClient = useQueryClient();
 
-    const { allSpecifics, isPending: subjectsPending } = useMySubjects();
   const { myClasses, allArms, userId } = useMyClasses();
-
-  const { data: staffData } = useQuery({
-    queryKey: ["all-staff"],
-    queryFn: async () => {
-      const res = await SERVER.get("staff");
-      return res?.data;
-    },
-    retry: false,
-  });
-  const allStaff = staffData?.data || [];
+  const { allSpecifics, isPending: subjectsPending } = useMySubjects();
 
   const levelsData = useClassLevels();
   const classLevels = levelsData?.data?.data?.data || [];
@@ -41,7 +38,7 @@ export default function Grading() {
   const [saved, setSaved] = useState<Marks>({});
   const [saving, setSaving] = useState(false);
 
-  // ---------- Subject names ----------
+  // ---------- Reference data ----------
   const { data: subjectsData } = useQuery({
     queryKey: ["all-subjects"],
     queryFn: async () => {
@@ -52,6 +49,16 @@ export default function Grading() {
   });
   const allSubjects = subjectsData?.data || [];
 
+  const { data: staffData } = useQuery({
+    queryKey: ["all-staff"],
+    queryFn: async () => {
+      const res = await SERVER.get("staff");
+      return res?.data;
+    },
+    retry: false,
+  });
+  const allStaff = staffData?.data || [];
+
   const armLabel = (armId: string) => {
     const arm = allArms.find((a: any) => a._id === armId);
     if (!arm) return "";
@@ -59,24 +66,27 @@ export default function Grading() {
     return `${level?.levelShortName || ""} ${arm.armName?.toUpperCase() || ""}`.trim();
   };
 
-  // ---------- What this teacher can grade ----------
-    const contexts = useMemo(() => {
+  // ---------- What this teacher can grade or oversee ----------
+  const contexts = useMemo(() => {
     const myArmIds = myClasses.map((c: any) => String(c._id));
 
     return allSpecifics
       .filter(
         (sp: any) =>
           String(sp.subjectTeacherId) === String(userId) ||
-          myArmIds.includes(String(sp.classArmId))
+          myArmIds.includes(String(sp.classArmId)),
       )
       .map((sp: any) => {
         const canEdit = String(sp.subjectTeacherId) === String(userId);
-        const teacher = allStaff.find((s: any) => s._id === sp.subjectTeacherId);
+        const teacher = allStaff.find(
+          (s: any) => s._id === sp.subjectTeacherId,
+        );
         const teacherName = teacher
           ? `${teacher.firstName || ""} ${teacher.surname || ""}`.trim()
           : "Not assigned";
         const subjectName =
-          allSubjects.find((s: any) => s._id === sp.subjectId)?.subjectName || "Subject";
+          allSubjects.find((s: any) => s._id === sp.subjectId)?.subjectName ||
+          "Subject";
 
         return {
           key: `${sp.classArmId}:${sp.subjectId}`,
@@ -87,7 +97,15 @@ export default function Grading() {
           label: `${subjectName} · ${armLabel(sp.classArmId)}${canEdit ? "" : ` — ${teacherName}`}`,
         };
       });
-  }, [allSpecifics, myClasses, userId, allStaff, allSubjects, allArms, classLevels]);
+  }, [
+    allSpecifics,
+    myClasses,
+    userId,
+    allStaff,
+    allSubjects,
+    allArms,
+    classLevels,
+  ]);
 
   useEffect(() => {
     if (!contextKey && contexts.length > 0) setContextKey(contexts[0].key);
@@ -97,9 +115,11 @@ export default function Grading() {
     if (!termId && activeTerm?._id) setTermId(activeTerm._id);
   }, [activeTerm, termId]);
 
-    const context = contexts.find((c: any) => c.key === contextKey);
+  const context = contexts.find((c: any) => c.key === contextKey);
   const arm = allArms.find((a: any) => a._id === context?.classArmId);
-  const isFormTeacher = myClasses.some((c: any) => c._id === context?.classArmId);
+  const isFormTeacher = myClasses.some(
+    (c: any) => c._id === context?.classArmId,
+  );
   const readOnly = !!context && !context.canEdit;
 
   // ---------- Terms in this session ----------
@@ -114,7 +134,7 @@ export default function Grading() {
   });
   const terms = termsData || [];
 
-  // ---------- Assessment format for this class level ----------
+  // ---------- Assessment format ----------
   const { data: formatData, isPending: formatPending } = useQuery({
     queryKey: ["assessment-format", arm?.classLevelId],
     queryFn: async () => {
@@ -125,13 +145,19 @@ export default function Grading() {
     retry: false,
   });
   const format = formatData?.data;
+
   const definitions = useMemo(
     () =>
       format?.assessments
-        ? [...format.assessments].sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+        ? [...format.assessments].sort(
+            (a: any, b: any) => (a.order || 0) - (b.order || 0),
+          )
         : [],
-    [format]
+    [format],
   );
+  const manualDefs = definitions.filter((d: any) => d.source !== "attendance");
+  const attendanceDef =
+    definitions.find((d: any) => d.source === "attendance") || null;
 
   // ---------- Students ----------
   const { data: studentsData, isPending: studentsPending } = useQuery({
@@ -144,6 +170,39 @@ export default function Grading() {
     retry: false,
   });
   const students = studentsData?.data || [];
+
+  // ---------- Attendance for the term (only when the format uses it) ----------
+  const { data: attendanceData } = useQuery({
+    queryKey: ["class-attendance-term", context?.classArmId, termId],
+    queryFn: async () => {
+      const res = await SERVER.get(
+        `attendance?classArmId=${context.classArmId}&termId=${termId}`,
+      );
+      return res?.data;
+    },
+    enabled: !!attendanceDef && !!context?.classArmId && !!termId,
+    retry: false,
+  });
+
+  const attendanceMarks = useMemo(() => {
+    const out: Record<string, number | null> = {};
+    if (!attendanceDef) return out;
+    const tally: Record<string, { present: number; scored: number }> = {};
+    (attendanceData?.data || []).forEach((r: any) => {
+      const sid = String(r.studentId);
+      if (!tally[sid]) tally[sid] = { present: 0, scored: 0 };
+      if (r.status === "present") tally[sid].present++;
+      if (!r.autoMarked) tally[sid].scored++;
+    });
+    students.forEach((s: any) => {
+      const t = tally[String(s._id)];
+      out[s._id] =
+        t && t.scored > 0
+          ? Math.round((t.present / t.scored) * attendanceDef.maxScore)
+          : null;
+    });
+    return out;
+  }, [attendanceData, attendanceDef, students]);
 
   // ---------- Grade bands ----------
   const { data: gradesData } = useQuery({
@@ -158,30 +217,41 @@ export default function Grading() {
 
   const gradeFor = (total: number) =>
     gradeBands.find(
-      (g: any) => total >= (g.scoreRange?.from ?? 0) && total <= (g.scoreRange?.to ?? 100)
+      (g: any) =>
+        total >= (g.scoreRange?.from ?? 0) &&
+        total <= (g.scoreRange?.to ?? 100),
     );
 
   // ---------- Existing scores ----------
   const { data: existingData } = useQuery({
-    queryKey: ["class-subject-results", context?.classArmId, context?.subjectId, termId],
+    queryKey: [
+      "class-subject-results",
+      context?.classArmId,
+      context?.subjectId,
+      termId,
+    ],
     queryFn: async () => {
       const res = await SERVER.get(
-        `result/class/${context.classArmId}/subject/${context.subjectId}?termId=${termId}&sessionId=${activeSession._id}`
+        `result/class/${context.classArmId}/subject/${context.subjectId}?termId=${termId}&sessionId=${activeSession._id}`,
       );
       return res?.data;
     },
-    enabled: !!context?.classArmId && !!context?.subjectId && !!termId && !!activeSession?._id,
+    enabled:
+      !!context?.classArmId &&
+      !!context?.subjectId &&
+      !!termId &&
+      !!activeSession?._id,
     retry: false,
   });
 
-  // Seed the sheet from what's stored
+  // Seed the sheet from what's stored — manual assessments only
   useEffect(() => {
     const rows = existingData?.data || [];
     const seeded: Marks = {};
     students.forEach((s: any) => {
       const row = rows.find((r: any) => String(r.studentId) === String(s._id));
       const entry: Record<string, string> = {};
-      definitions.forEach((d: any) => {
+      manualDefs.forEach((d: any) => {
         const found = row?.scores?.find((sc: any) => sc.name === d.name);
         entry[d.name] = found ? String(found.score) : "";
       });
@@ -194,7 +264,7 @@ export default function Grading() {
   // ---------- Derived ----------
   const cellError = (name: string, raw: string) => {
     if (raw === "") return null;
-    const def = definitions.find((d: any) => d.name === name);
+    const def = manualDefs.find((d: any) => d.name === name);
     const value = Number(raw);
     if (Number.isNaN(value)) return "must be a number";
     if (value < 0 || value > (def?.maxScore ?? 100))
@@ -205,7 +275,7 @@ export default function Grading() {
   const errors = useMemo(() => {
     const list: { student: string; message: string }[] = [];
     students.forEach((s: any) => {
-      definitions.forEach((d: any) => {
+      manualDefs.forEach((d: any) => {
         const err = cellError(d.name, marks[s._id]?.[d.name] ?? "");
         if (err) {
           list.push({
@@ -216,22 +286,31 @@ export default function Grading() {
       });
     });
     return list;
-  }, [marks, definitions, students]);
+  }, [marks, manualDefs, students]);
 
-  const rowTotal = (studentId: string) =>
-    definitions.reduce((sum: number, d: any) => {
+  const rowTotal = (studentId: string) => {
+    const manual = manualDefs.reduce((sum: number, d: any) => {
       const raw = marks[studentId]?.[d.name] ?? "";
       const n = Number(raw);
       return raw === "" || Number.isNaN(n) ? sum : sum + n;
     }, 0);
+    const att = attendanceDef ? (attendanceMarks[studentId] ?? 0) : 0;
+    return manual + att;
+  };
 
   const rowComplete = (studentId: string) =>
-    definitions.length > 0 &&
-    definitions.every((d: any) => (marks[studentId]?.[d.name] ?? "") !== "");
+    manualDefs.length > 0 &&
+    manualDefs.every((d: any) => (marks[studentId]?.[d.name] ?? "") !== "") &&
+    (!attendanceDef || attendanceMarks[studentId] !== null);
 
   const enteredCount = students.filter((s: any) =>
-    definitions.some((d: any) => (marks[s._id]?.[d.name] ?? "") !== "")
+    manualDefs.some((d: any) => (marks[s._id]?.[d.name] ?? "") !== ""),
   ).length;
+
+  const noRegister =
+    !!attendanceDef &&
+    students.length > 0 &&
+    students.every((s: any) => attendanceMarks[s._id] === null);
 
   const isDirty = JSON.stringify(marks) !== JSON.stringify(saved);
 
@@ -259,11 +338,15 @@ export default function Grading() {
       return;
     }
 
+    // Attendance is never submitted — the backend computes it from the register
     const entries = students
       .map((s: any) => {
-        const scores = definitions
+        const scores = manualDefs
           .filter((d: any) => (marks[s._id]?.[d.name] ?? "") !== "")
-          .map((d: any) => ({ name: d.name, score: Number(marks[s._id][d.name]) }));
+          .map((d: any) => ({
+            name: d.name,
+            score: Number(marks[s._id][d.name]),
+          }));
         return { studentId: s._id, scores };
       })
       .filter((e: any) => e.scores.length > 0);
@@ -282,12 +365,23 @@ export default function Grading() {
         sessionId: activeSession._id,
         entries,
       });
-      toast.success(`Scores saved for ${entries.length} students`, toastOptions);
+      toast.success(
+        `Scores saved for ${entries.length} students`,
+        toastOptions,
+      );
       await queryClient.invalidateQueries({
-        queryKey: ["class-subject-results", context.classArmId, context.subjectId, termId],
+        queryKey: [
+          "class-subject-results",
+          context.classArmId,
+          context.subjectId,
+          termId,
+        ],
       });
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || "Could not save scores", toastOptions);
+      toast.error(
+        error?.response?.data?.error || "Could not save scores",
+        toastOptions,
+      );
     } finally {
       setSaving(false);
     }
@@ -299,7 +393,9 @@ export default function Grading() {
   if (contexts.length === 0) {
     return (
       <div className="max-w-[520px] py-12">
-        <h1 className="text-xl font-semibold text-secondary">Nothing to grade yet</h1>
+        <h1 className="text-xl font-semibold text-secondary">
+          Nothing to grade yet
+        </h1>
         <p className="mt-2 text-sm text-gray-1 leading-relaxed">
           You'll enter scores here once your school administrator assigns you a
           subject to teach.
@@ -352,6 +448,16 @@ export default function Grading() {
         )}
       </div>
 
+      {noRegister && (
+        <div className="rounded-[10px] bg-[#FAEEDA] px-4 py-3">
+          <p className="text-[13px] text-[#854F0B]">
+            No register has been taken for this class this term, so attendance
+            marks can't be computed yet. Totals will stay incomplete until it
+            is.
+          </p>
+        </div>
+      )}
+
       {formatPending ? (
         <Loader />
       ) : definitions.length === 0 ? (
@@ -360,15 +466,17 @@ export default function Grading() {
             No assessment format for this class level
           </p>
           <p className="mt-1 text-sm text-text-ter">
-            Your school administrator sets this in Academics → Assessment Format.
-            Scores can't be entered until it exists.
+            Your school administrator sets this in Academics → Assessment
+            Format. Scores can't be entered until it exists.
           </p>
         </div>
       ) : studentsPending ? (
         <Loader />
       ) : students.length === 0 ? (
         <div className="border border-[#DEE0E0] rounded-[12px] p-8 text-center">
-          <p className="text-[15px] text-text-pry">No students in this class yet</p>
+          <p className="text-[15px] text-text-pry">
+            No students in this class yet
+          </p>
         </div>
       ) : (
         <div className="border border-[#DEE0E0] rounded-[12px] overflow-hidden">
@@ -381,9 +489,17 @@ export default function Grading() {
               <span>Student</span>
               {definitions.map((d: any) => (
                 <span key={d.name} className="text-center">
+                  {d.source === "attendance" && (
+                    <EventAvailable
+                      sx={{ fontSize: 12 }}
+                      className="mr-0.5 -mt-0.5"
+                    />
+                  )}
                   {d.name}
                   <br />
-                  <span className="text-text-ter tabular-nums">/{d.maxScore}</span>
+                  <span className="text-text-ter tabular-nums">
+                    /{d.maxScore}
+                  </span>
                 </span>
               ))}
               <span className="text-center">Total</span>
@@ -407,6 +523,21 @@ export default function Grading() {
                     </span>
 
                     {definitions.map((d: any, colIndex: number) => {
+                      if (d.source === "attendance") {
+                        const mark = attendanceMarks[student._id];
+                        return (
+                          <span
+                            key={d.name}
+                            className="text-center tabular-nums"
+                            title="Computed from the register"
+                          >
+                            <span className="inline-block w-[52px] py-1.5 rounded-[6px] bg-bg-7 text-text-sec">
+                              {mark === null || mark === undefined ? "—" : mark}
+                            </span>
+                          </span>
+                        );
+                      }
+
                       const raw = marks[student._id]?.[d.name] ?? "";
                       const err = cellError(d.name, raw);
                       return (
@@ -418,7 +549,9 @@ export default function Grading() {
                             value={raw}
                             placeholder="—"
                             aria-label={`${d.name} for ${student.firstName}`}
-                            onChange={(e) => setCell(student._id, d.name, e.target.value)}
+                            onChange={(e) =>
+                              setCell(student._id, d.name, e.target.value)
+                            }
                             onKeyDown={(e) => onKeyDown(e, rowIndex, colIndex)}
                             disabled={readOnly}
                             className={`w-[52px] text-center py-1.5 rounded-[6px] border tabular-nums outline-none focus:border-tertiary ${
@@ -447,16 +580,19 @@ export default function Grading() {
                     </span>
                   </div>
 
-                  {definitions.map((d: any) => {
-                    const err = cellError(d.name, marks[student._id]?.[d.name] ?? "");
+                  {manualDefs.map((d: any) => {
+                    const err = cellError(
+                      d.name,
+                      marks[student._id]?.[d.name] ?? "",
+                    );
                     if (!err) return null;
                     return (
                       <p
                         key={`err-${d.name}`}
                         className="px-4 py-1.5 bg-[#FDEEED] text-[12px] text-[#C2453D] border-t border-[#EFF5F8]"
                       >
-                        {`${student.firstName || ""} ${student.surName || ""}`.trim()} ·{" "}
-                        {d.name} {err}
+                        {`${student.firstName || ""} ${student.surName || ""}`.trim()}{" "}
+                        · {d.name} {err}
                       </p>
                     );
                   })}
@@ -477,29 +613,37 @@ export default function Grading() {
               )}
             </p>
             <div className="flex gap-3">
-              {isDirty && (
-                <button
-                  onClick={handleDiscard}
-                  className="px-4 py-2.5 rounded-[10px] text-sm text-text-sec border border-[#DEE0E0] hover:border-tertiary transition-colors"
-                >
-                  Discard changes
-                </button>
+              {readOnly ? (
+                <p className="text-[13px] text-text-ter">
+                  Taught by {context.teacherName} — view only
+                </p>
+              ) : (
+                <>
+                  {isDirty && (
+                    <button
+                      onClick={handleDiscard}
+                      className="px-4 py-2.5 rounded-[10px] text-sm text-text-sec border border-[#DEE0E0] hover:border-tertiary transition-colors"
+                    >
+                      Discard changes
+                    </button>
+                  )}
+                  <Button
+                    color="tertiary"
+                    variant="contained"
+                    onClick={handleSave}
+                    disabled={saving || errors.length > 0 || !isDirty}
+                    sx={{
+                      color: "white",
+                      borderRadius: "10px",
+                      paddingY: "10px",
+                      paddingX: "24px",
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    {saving ? "Saving..." : "Save scores"}
+                  </Button>
+                </>
               )}
-              <Button
-                color="tertiary"
-                variant="contained"
-                onClick={handleSave}
-                disabled={saving || errors.length > 0 || !isDirty}
-                sx={{
-                  color: "white",
-                  borderRadius: "10px",
-                  paddingY: "10px",
-                  paddingX: "24px",
-                  textTransform: "capitalize",
-                }}
-              >
-                {saving ? "Saving..." : "Save scores"}
-              </Button>
             </div>
           </div>
         </div>
@@ -507,6 +651,7 @@ export default function Grading() {
 
       <p className="text-xs text-text-ter">
         Enter moves down the column · Tab moves across the row
+        {attendanceDef && " · Attendance is computed from the register"}
       </p>
     </div>
   );
