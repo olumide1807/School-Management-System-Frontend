@@ -8,10 +8,14 @@ export const ordinal = (n: number | null | undefined) => {
   const mod100 = n % 100;
   if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
   switch (n % 10) {
-    case 1: return `${n}st`;
-    case 2: return `${n}nd`;
-    case 3: return `${n}rd`;
-    default: return `${n}th`;
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
   }
 };
 
@@ -26,9 +30,18 @@ type Props = {
   };
   armLabel: string;
   schoolName?: string;
+  principalName?: string;
+  formTeacherName?: string;
 };
 
-export default function ReportCard({ report, meta, armLabel, schoolName }: Props) {
+export default function ReportCard({
+  report,
+  meta,
+  armLabel,
+  schoolName,
+  principalName,
+  formTeacherName,
+}: Props) {
   const { student, subjects, summary, attendance } = report;
   const statsFor = (subjectId: string) =>
     meta.subjects.find((s) => s.subjectId === subjectId)?.stats;
@@ -84,7 +97,9 @@ export default function ReportCard({ report, meta, armLabel, schoolName }: Props
               {meta.assessments.map((a) => (
                 <th key={a.name} className="font-medium px-2 py-2 text-center">
                   {a.name}
-                  <span className="block text-gray-400 font-normal">/{a.maxScore}</span>
+                  <span className="block text-gray-400 font-normal">
+                    /{a.maxScore}
+                  </span>
                 </th>
               ))}
               <th className="font-medium px-2 py-2 text-center">Total</th>
@@ -101,15 +116,28 @@ export default function ReportCard({ report, meta, armLabel, schoolName }: Props
                 <tr key={s.subjectId} className="border-t border-[#EFF5F8]">
                   <td className="px-3 py-2">{s.subjectName}</td>
                   {meta.assessments.map((a) => {
-                    const found = s.scores?.find((sc: any) => sc.name === a.name);
+                    const found = s.scores?.find(
+                      (sc: any) => sc.name === a.name,
+                    );
                     return (
-                      <td key={a.name} className="px-2 py-2 text-center tabular-nums">
-                        {found ? found.score : <span className="text-gray-300">—</span>}
+                      <td
+                        key={a.name}
+                        className="px-2 py-2 text-center tabular-nums"
+                      >
+                        {found ? (
+                          found.score
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
                     );
                   })}
                   <td className="px-2 py-2 text-center font-medium tabular-nums">
-                    {s.entered ? s.Total : <span className="text-gray-300">—</span>}
+                    {s.entered ? (
+                      s.Total
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
                   </td>
                   <td
                     className="px-2 py-2 text-center font-medium"
@@ -121,11 +149,17 @@ export default function ReportCard({ report, meta, armLabel, schoolName }: Props
                     {s.entered ? (
                       s.remark || "—"
                     ) : (
-                      <span className="italic text-gray-400">Not yet entered</span>
+                      <span className="italic text-gray-400">
+                        Not yet entered
+                      </span>
                     )}
                   </td>
                   <td className="px-2 py-2 text-center tabular-nums">
-                    {s.entered ? ordinal(s.position) : <span className="text-gray-300">—</span>}
+                    {s.entered ? (
+                      ordinal(s.position)
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
                   </td>
                   <td className="px-2 py-2 text-center tabular-nums text-gray-600">
                     {stats?.average ?? <span className="text-gray-300">—</span>}
@@ -150,7 +184,10 @@ export default function ReportCard({ report, meta, armLabel, schoolName }: Props
           <p className="text-xl font-semibold tabular-nums mt-0.5">
             {ordinal(summary.position)}
             {summary.position !== null && (
-              <span className="text-sm text-gray-500 font-normal"> of {summary.outOf}</span>
+              <span className="text-sm text-gray-500 font-normal">
+                {" "}
+                of {summary.outOf}
+              </span>
             )}
           </p>
         </div>
@@ -158,15 +195,18 @@ export default function ReportCard({ report, meta, armLabel, schoolName }: Props
           <p className="text-xs text-gray-500">Subjects graded</p>
           <p className="text-xl font-semibold tabular-nums mt-0.5">
             {summary.subjectsGraded}
-            <span className="text-sm text-gray-500 font-normal"> of {summary.subjectsOffered}</span>
+            <span className="text-sm text-gray-500 font-normal">
+              {" "}
+              of {summary.subjectsOffered}
+            </span>
           </p>
         </div>
       </div>
 
       {summary.subjectsGraded < summary.subjectsOffered && (
         <p className="text-xs text-gray-500 mb-5">
-          Average and position are based on graded subjects only, and will change
-          as remaining scores are entered.
+          Average and position are based on graded subjects only, and will
+          change as remaining scores are entered.
         </p>
       )}
 
@@ -179,10 +219,37 @@ export default function ReportCard({ report, meta, armLabel, schoolName }: Props
               .sort((a, b) => (b.from ?? 0) - (a.from ?? 0))
               .map((b) => (
                 <span key={b.grade}>
-                  <span className="font-medium text-black">{b.grade}</span> {b.from}–{b.to}{" "}
-                  {b.remark}
+                  <span className="font-medium text-black">{b.grade}</span>{" "}
+                  {b.from}–{b.to} {b.remark}
                 </span>
               ))}
+          </div>
+
+          {/* Comments */}
+          <div className="border-t border-[#DEE0E0] pt-4 mt-4 flex flex-col gap-4">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">
+                Form teacher's comment
+              </p>
+              <p className="text-sm text-black">
+                {report.comments?.teacher || "—"}
+              </p>
+              <div className="mt-6 border-b border-gray-300 w-56" />
+              <p className="text-xs text-gray-500 mt-1">
+                {formTeacherName || "Form teacher"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Principal's comment</p>
+              <p className="text-sm text-black">
+                {report.comments?.principal || "—"}
+              </p>
+              <div className="mt-6 border-b border-gray-300 w-56" />
+              <p className="text-xs text-gray-500 mt-1">
+                {principalName || "Principal"}
+              </p>
+            </div>
           </div>
         </div>
       )}

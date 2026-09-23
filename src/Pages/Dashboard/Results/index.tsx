@@ -2,9 +2,14 @@ import { useState, useEffect, useMemo } from "react";
 import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
+import { createPortal } from "react-dom";
 
 import SERVER from "../../../Utils/server";
-import { useClassArms, useClassLevels, useSessionTerm } from "../../../services/api-call";
+import {
+  useClassArms,
+  useClassLevels,
+  useSessionTerm,
+} from "../../../services/api-call";
 import usePermissions from "../../../hooks/usePermissions";
 import useMyClasses from "../../../hooks/useMyClasses";
 import useMySubjects from "../../../hooks/useMySubjects";
@@ -46,17 +51,25 @@ export default function Results() {
     const ids = new Set<string>([
       ...myClasses.map((c: any) => String(c._id)),
       ...allSpecifics
-        .filter((sp: any) => String(sp.subjectTeacherId) === String(userData?._id))
+        .filter(
+          (sp: any) => String(sp.subjectTeacherId) === String(userData?._id),
+        )
         .map((sp: any) => String(sp.classArmId)),
     ]);
     return allClassArms.filter((a: any) => ids.has(String(a._id)));
-  }, [permissions.canViewAllClasses, allClassArms, myClasses, allSpecifics, userData]);
+  }, [
+    permissions.canViewAllClasses,
+    allClassArms,
+    myClasses,
+    allSpecifics,
+    userData,
+  ]);
 
   useEffect(() => {
     if (!armId && availableArms.length > 0) {
       // Prefer the teacher's own form class
       const own = availableArms.find((a: any) =>
-        myClasses.some((c: any) => String(c._id) === String(a._id))
+        myClasses.some((c: any) => String(c._id) === String(a._id)),
       );
       setArmId((own || availableArms[0])._id);
     }
@@ -77,11 +90,15 @@ export default function Results() {
   });
   const terms = termsData || [];
 
-  const { data: reportData, isPending, isError } = useQuery({
+  const {
+    data: reportData,
+    isPending,
+    isError,
+  } = useQuery({
     queryKey: ["class-report", armId, termId, activeSession?._id],
     queryFn: async () => {
       const res = await SERVER.get(
-        `result/report/class/${armId}?termId=${termId}&sessionId=${activeSession._id}`
+        `result/report/class/${armId}?termId=${termId}&sessionId=${activeSession._id}`,
       );
       return res?.data?.data;
     },
@@ -100,10 +117,19 @@ export default function Results() {
         if (pa !== pb) return pa - pb;
         return `${a.student.surName}`.localeCompare(`${b.student.surName}`);
       }),
-    [reports]
+    [reports],
   );
 
-  const schoolName = userData?.schoolName; // super admin only for now — branding comes with report card settings
+  const { data: schoolInfoData } = useQuery({
+    queryKey: ["school-info"],
+    queryFn: async () => {
+      const res = await SERVER.get("settings/school-info");
+      return res?.data?.data;
+    },
+    retry: false,
+  });
+  const schoolName = schoolInfoData?.school?.name; // super admin only for now — branding comes with report card settings
+  const principalName = schoolInfoData?.principal?.name;
 
   const print = (mode: "one" | "all") => {
     setPrintMode(mode);
@@ -119,7 +145,9 @@ export default function Results() {
   if (availableArms.length === 0 && !armsData?.isPending) {
     return (
       <div className="max-w-[520px] py-12">
-        <h1 className="text-xl font-semibold text-secondary">No classes to show</h1>
+        <h1 className="text-xl font-semibold text-secondary">
+          No classes to show
+        </h1>
         <p className="mt-2 text-sm text-gray-1 leading-relaxed">
           Results appear here for classes you form-teach or teach a subject in.
         </p>
@@ -186,11 +214,15 @@ export default function Results() {
           <Loader />
         ) : isError ? (
           <div className="border border-[#DEE0E0] rounded-[12px] p-8 text-center">
-            <p className="text-[15px] text-text-pry">Couldn't load this class's results</p>
+            <p className="text-[15px] text-text-pry">
+              Couldn't load this class's results
+            </p>
           </div>
         ) : reports.length === 0 ? (
           <div className="border border-[#DEE0E0] rounded-[12px] p-8 text-center">
-            <p className="text-[15px] text-text-pry">No students in this class</p>
+            <p className="text-[15px] text-text-pry">
+              No students in this class
+            </p>
           </div>
         ) : viewing ? (
           /* ---------- Single report card ---------- */
@@ -215,7 +247,9 @@ export default function Results() {
                 </span>
                 <button
                   onClick={() =>
-                    setViewingIndex((i) => (i! < ordered.length - 1 ? i! + 1 : i))
+                    setViewingIndex((i) =>
+                      i! < ordered.length - 1 ? i! + 1 : i,
+                    )
                   }
                   disabled={viewingIndex === ordered.length - 1}
                   className="px-3 py-2 rounded-[8px] text-sm border border-[#DEE0E0] disabled:opacity-40"
@@ -236,6 +270,7 @@ export default function Results() {
               meta={meta}
               armLabel={armLabel(armId)}
               schoolName={schoolName}
+              principalName={principalName}
             />
           </div>
         ) : (
@@ -245,17 +280,28 @@ export default function Results() {
               <table className="w-full text-sm min-w-[560px]">
                 <thead>
                   <tr className="bg-bg-7 text-[12px] text-text-sec">
-                    <th className="text-left font-medium px-4 py-3 w-16">Pos</th>
+                    <th className="text-left font-medium px-4 py-3 w-16">
+                      Pos
+                    </th>
                     <th className="text-left font-medium px-4 py-3">Student</th>
-                    <th className="text-center font-medium px-4 py-3">Average</th>
-                    <th className="text-center font-medium px-4 py-3">Graded</th>
-                    <th className="text-center font-medium px-4 py-3">Attendance</th>
+                    <th className="text-center font-medium px-4 py-3">
+                      Average
+                    </th>
+                    <th className="text-center font-medium px-4 py-3">
+                      Graded
+                    </th>
+                    <th className="text-center font-medium px-4 py-3">
+                      Attendance
+                    </th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {ordered.map((r: any, i: number) => (
-                    <tr key={r.student._id} className="border-t border-[#EFF5F8]">
+                    <tr
+                      key={r.student._id}
+                      className="border-t border-[#EFF5F8]"
+                    >
                       <td className="px-4 py-3 tabular-nums font-medium">
                         {ordinal(r.summary.position)}
                       </td>
@@ -263,13 +309,16 @@ export default function Results() {
                         <p className="text-text-pry">
                           {`${r.student.surName || ""} ${r.student.firstName || ""}`.trim()}
                         </p>
-                        <p className="text-xs text-text-ter">{r.student.studentID}</p>
+                        <p className="text-xs text-text-ter">
+                          {r.student.studentID}
+                        </p>
                       </td>
                       <td className="px-4 py-3 text-center tabular-nums">
                         {r.summary.average ?? "—"}
                       </td>
                       <td className="px-4 py-3 text-center tabular-nums text-text-sec">
-                        {r.summary.subjectsGraded} of {r.summary.subjectsOffered}
+                        {r.summary.subjectsGraded} of{" "}
+                        {r.summary.subjectsOffered}
                       </td>
                       <td className="px-4 py-3 text-center tabular-nums text-text-sec">
                         {r.attendance.total > 0
@@ -294,20 +343,26 @@ export default function Results() {
       </div>
 
       {/* ---------- Print area: hidden on screen, the only thing printed ---------- */}
-      {printMode && meta && (
-        <div id="print-area" className="hidden print:block">
-          {(printMode === "all" ? ordered : viewing ? [viewing] : []).map((r: any) => (
-            <div key={r.student._id} className="report-page">
-              <ReportCard
-                report={r}
-                meta={meta}
-                armLabel={armLabel(armId)}
-                schoolName={schoolName}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+      {printMode &&
+        meta &&
+        createPortal(
+          <div id="print-area" className="hidden print:block">
+            {(printMode === "all" ? ordered : viewing ? [viewing] : []).map(
+              (r: any) => (
+                <div key={r.student._id} className="report-page">
+                  <ReportCard
+                    report={r}
+                    meta={meta}
+                    armLabel={armLabel(armId)}
+                    schoolName={schoolName}
+                    principalName={principalName}
+                  />
+                </div>
+              ),
+            )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
