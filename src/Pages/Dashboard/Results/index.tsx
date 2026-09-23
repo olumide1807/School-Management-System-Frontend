@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
+import { Button, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
+import { useQuery,  useQueryClient } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
 import { createPortal } from "react-dom";
 
@@ -15,8 +15,13 @@ import useMyClasses from "../../../hooks/useMyClasses";
 import useMySubjects from "../../../hooks/useMySubjects";
 import Loader from "../../loaders/Loader";
 import ReportCard, { ordinal } from "./ReportCard";
+import { toast } from "react-toastify";
+import Modal from "../../../Components/Modals";
+import { toastOptions } from "../../../Utils/toastOptions";
 
 export default function Results() {
+  const queryClient = useQueryClient();
+
   const permissions = usePermissions();
   const userData = useSelector((state: any) => state.user?.user);
 
@@ -131,6 +136,55 @@ export default function Results() {
   const schoolName = schoolInfoData?.school?.name; // super admin only for now — branding comes with report card settings
   const principalName = schoolInfoData?.principal?.name;
 
+  const role = useSelector((state: any) => state.user?.role);
+  const userId = userData?._id;
+  const principal = schoolInfoData?.principal;
+
+  const canEditPrincipalComment =
+    role === "super admin" || String(principal?._id || "") === String(userId);
+
+  const [openComments, setOpenComments] = useState(false);
+  const [teacherDraft, setTeacherDraft] = useState("");
+  const [principalDraft, setPrincipalDraft] = useState("");
+  const [savingComment, setSavingComment] = useState(false);
+
+  const openCommentEditor = () => {
+    setTeacherDraft(
+      viewing?.comments?.teacherIsOverride ? viewing.comments.teacher : "",
+    );
+    setPrincipalDraft(
+      viewing?.comments?.principalIsOverride ? viewing.comments.principal : "",
+    );
+    setOpenComments(true);
+  };
+
+  const saveComments = async () => {
+    setSavingComment(true);
+    try {
+      const payload: any = {
+        studentId: viewing.student._id,
+        termId,
+        sessionId: activeSession._id,
+      };
+      if (canEditTeacherComment) payload.teacherComment = teacherDraft;
+      if (canEditPrincipalComment) payload.principalComment = principalDraft;
+
+      await SERVER.put("result/comments", payload);
+      toast.success("Comment saved", toastOptions);
+      await queryClient.invalidateQueries({
+        queryKey: ["class-report", armId, termId, activeSession?._id],
+      });
+      setOpenComments(false);
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.error || "Could not save comment",
+        toastOptions,
+      );
+    } finally {
+      setSavingComment(false);
+    }
+  };
+
   const print = (mode: "one" | "all") => {
     setPrintMode(mode);
     setTimeout(() => {
@@ -141,6 +195,11 @@ export default function Results() {
 
   const viewing = viewingIndex !== null ? ordered[viewingIndex] : null;
   const meta = reportData;
+
+  const canEditTeacherComment =
+    role === "super admin" ||
+    role === "admin" ||
+    String(meta?.formTeacher?._id || "") === String(userId);
 
   if (availableArms.length === 0 && !armsData?.isPending) {
     return (
@@ -262,6 +321,14 @@ export default function Results() {
                 >
                   Print
                 </button>
+                {(canEditTeacherComment || canEditPrincipalComment) && (
+                  <button
+                    onClick={openCommentEditor}
+                    className="px-4 py-2 rounded-[8px] text-sm text-tertiary border border-tertiary hover:bg-bg-2 transition-colors ml-2"
+                  >
+                    Edit comments
+                  </button>
+                )}
               </div>
             </div>
 
@@ -271,6 +338,7 @@ export default function Results() {
               armLabel={armLabel(armId)}
               schoolName={schoolName}
               principalName={principalName}
+              formTeacherName={meta?.formTeacher?.name}
             />
           </div>
         ) : (
@@ -356,6 +424,7 @@ export default function Results() {
                     armLabel={armLabel(armId)}
                     schoolName={schoolName}
                     principalName={principalName}
+                    formTeacherName={meta?.formTeacher?.name}
                   />
                 </div>
               ),
@@ -363,6 +432,64 @@ export default function Results() {
           </div>,
           document.body,
         )}
+
+      <Modal
+        openModal={openComments}
+        closeModal={() => setOpenComments(false)}
+        title={`Comments — ${viewing?.student?.firstName || ""} ${viewing?.student?.surName || ""}`}
+        maxWidth="560px"
+      >
+        <div className="flex flex-col gap-5">
+          <p className="text-sm text-gray-600">
+            Leave a box empty to use the default comment for this student's
+            average.
+          </p>
+
+          {canEditTeacherComment && (
+            <label className="flex flex-col gap-1">
+              <span className="text-sm text-gray-700">
+                Form teacher's comment
+              </span>
+              <textarea
+                rows={3}
+                value={teacherDraft}
+                onChange={(e) => setTeacherDraft(e.target.value)}
+                placeholder={viewing?.comments?.teacher || ""}
+                className="border border-gray-300 rounded-lg p-2.5 text-sm resize-none"
+              />
+            </label>
+          )}
+
+          {canEditPrincipalComment && (
+            <label className="flex flex-col gap-1">
+              <span className="text-sm text-gray-700">Principal's comment</span>
+              <textarea
+                rows={3}
+                value={principalDraft}
+                onChange={(e) => setPrincipalDraft(e.target.value)}
+                placeholder={viewing?.comments?.principal || ""}
+                className="border border-gray-300 rounded-lg p-2.5 text-sm resize-none"
+              />
+            </label>
+          )}
+
+          <Button
+            color="tertiary"
+            variant="contained"
+            onClick={saveComments}
+            disabled={savingComment}
+            sx={{
+              color: "white",
+              borderRadius: "10px",
+              paddingY: "12px",
+              width: "fit-content",
+              textTransform: "none",
+            }}
+          >
+            {savingComment ? "Saving…" : "Save comments"}
+          </Button>
+        </div>
+      </Modal>
     </>
   );
 }
