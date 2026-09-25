@@ -10,7 +10,7 @@ const Input = ({
   label,
   max,
   pattern
-}) => {
+}: any) => {
   return (
     <div className="w-full">
       

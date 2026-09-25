@@ -19,6 +19,7 @@ import ClassLevel from "./Pages/Dashboard/SchoolManagement/Academics/tabs/tab2/C
 import View from "./Pages/Dashboard/SchoolManagement/Academics/tabs/tab2/View";
 import ViewClassLevel from "./Pages/Dashboard/SchoolManagement/Academics/tabs/tab2/ViewClassLevel";
 import Results from "./Pages/Dashboard/Results";
+import ChangePassword from "./Pages/Auth/ChangePassword";
 
 import { useDispatch, useSelector } from "react-redux";
 import DashboardLayout from "./Templates/DashboardLayout/index";
@@ -169,8 +170,20 @@ function AllRoutes() {
     <Routes>
       {/* DashBoard Screens - Protected: redirect to /login if not authenticated */}
       <Route
+        path="/change-password"
+        element={currentUser ? <ChangePassword /> : <Navigate to="/login" />}
+      />
+      <Route
         path="/"
-        element={currentUser ? <DashboardLayout /> : <Navigate to="/login" />}
+        element={
+          !currentUser ? (
+            <Navigate to="/login" />
+          ) : sessionStorage.getItem("mustChangePassword") === "true" ? (
+            <Navigate to="/change-password" />
+          ) : (
+            <DashboardLayout />
+          )
+        }
       >
         <Route path="school-management/">
           <Route index element={permissions.canAccessSchoolManagement ? <AdminDashboard /> : <Navigate to="/" />} />

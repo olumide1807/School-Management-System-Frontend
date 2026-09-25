@@ -5,7 +5,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import IconButton from "@mui/material/IconButton";
 
-const InputField = forwardRef(
+const InputField = forwardRef<any, any>(
   (
     {
       type = "text",
