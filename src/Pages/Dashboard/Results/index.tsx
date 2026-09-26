@@ -1,6 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
-import { Button, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
-import { useQuery,  useQueryClient } from "@tanstack/react-query";
+import {
+  Button,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+} from "@mui/material";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
 import { createPortal } from "react-dom";
 
@@ -201,6 +207,41 @@ export default function Results() {
     role === "admin" ||
     String(meta?.formTeacher?._id || "") === String(userId);
 
+  const publication = meta?.publication;
+
+  const togglePublish = async () => {
+    const incomplete = reports.filter(
+      (r: any) => r.summary.subjectsGraded < r.summary.subjectsOffered,
+    ).length;
+
+    if (!publication?.published && incomplete > 0) {
+      const ok = window.confirm(
+        `${incomplete} of ${reports.length} students have subjects with no scores yet. ` +
+          `Their averages and positions will be based on what's been entered. Publish anyway?`,
+      );
+      if (!ok) return;
+    }
+
+    try {
+      const body = { classArmId: armId, termId, sessionId: activeSession._id };
+      if (publication?.published) {
+        await SERVER.delete("result/publish", { data: body });
+        toast.success("Results withdrawn", toastOptions);
+      } else {
+        await SERVER.post("result/publish", body);
+        toast.success("Results published", toastOptions);
+      }
+      await queryClient.invalidateQueries({
+        queryKey: ["class-report", armId, termId, activeSession?._id],
+      });
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.error || "Could not update",
+        toastOptions,
+      );
+    }
+  };
+
   if (availableArms.length === 0 && !armsData?.isPending) {
     return (
       <div className="max-w-[520px] py-12">
@@ -259,6 +300,35 @@ export default function Results() {
 
           <div className="flex-1" />
 
+          {reports.length > 0 && (
+            <span
+              className={`text-xs px-3 py-1.5 rounded-[8px] ${
+                publication?.published
+                  ? "bg-[#EAF3DE] text-[#3B6D11]"
+                  : "bg-bg-7 text-text-ter"
+              }`}
+            >
+              {publication?.published
+                ? "Published to parents"
+                : "Not published"}
+            </span>
+          )}
+          {reports.length > 0 &&
+            viewingIndex === null &&
+            permissions.canAccessSettings && (
+              <button
+                onClick={togglePublish}
+                className={`px-4 py-2.5 rounded-[10px] text-sm transition-colors ${
+                  publication?.published
+                    ? "text-text-sec border border-[#DEE0E0] hover:border-tertiary"
+                    : "text-white bg-tertiary hover:bg-secondary"
+                }`}
+              >
+                {publication?.published
+                  ? "Withdraw results"
+                  : "Publish results"}
+              </button>
+            )}
           {reports.length > 0 && viewingIndex === null && (
             <button
               onClick={() => print("all")}
