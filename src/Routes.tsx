@@ -21,6 +21,7 @@ import ViewClassLevel from "./Pages/Dashboard/SchoolManagement/Academics/tabs/ta
 import Results from "./Pages/Dashboard/Results";
 import ChangePassword from "./Pages/Auth/ChangePassword";
 import StudentResults from "./Pages/Dashboard/Student/Results";
+import StudentAttendance from "./Pages/Dashboard/Student/Attendance";
 
 import { useDispatch, useSelector } from "react-redux";
 import DashboardLayout from "./Templates/DashboardLayout/index";
@@ -215,6 +216,7 @@ function AllRoutes() {
         <Route path="my-students" element={<MyStudents />} />
         <Route path="my-profile" element={<ViewStaffProfile />} />
         <Route path="my-results" element={<StudentResults />} />
+        <Route path="my-attendance" element={<StudentAttendance />} />
         <Route path="support" element={<Support />} />
         <Route path="settings" element={permissions.canAccessSettings ? <Settings /> : <Navigate to="/" />} />
       </Route>
