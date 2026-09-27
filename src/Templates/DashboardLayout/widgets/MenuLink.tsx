@@ -30,8 +30,16 @@ const AdminMenuLinks: MenuItem[] = [
       { name: "Results", link: "results" },
     ],
   },
-  { icon: <StaffMgtMenuIcon />, name: "Staff Management", link: "staff-management" },
-  { icon: <StudMgtMenuIcon />, name: "Student Management", link: "student-management" },
+  {
+    icon: <StaffMgtMenuIcon />,
+    name: "Staff Management",
+    link: "staff-management",
+  },
+  {
+    icon: <StudMgtMenuIcon />,
+    name: "Student Management",
+    link: "student-management",
+  },
   { icon: <SettingsIcon />, name: "Settings", link: "settings" },
   { icon: <SupportIcon />, name: "Support", link: "support" },
 ];
@@ -39,12 +47,20 @@ const AdminMenuLinks: MenuItem[] = [
 // Academic staff navigation — scoped to their own class and record
 const TeacherMenuLinks: MenuItem[] = [
   { icon: <DashboardMenuIcon />, name: "Dashboard", link: "/" },
-  { icon: <SchMgtMenuIcon />, name: "Attendance", link: "school-management/attendance" },
+  {
+    icon: <SchMgtMenuIcon />,
+    name: "Attendance",
+    link: "school-management/attendance",
+  },
   { icon: <StudMgtMenuIcon />, name: "My students", link: "my-students" },
   { icon: <StaffMgtMenuIcon />, name: "My profile", link: "my-profile" },
   { icon: <SupportIcon />, name: "Support", link: "support" },
   { icon: <SchMgtMenuIcon />, name: "Grading", link: "grading" },
-  { icon: <SchMgtMenuIcon />, name: "Results", link: "school-management/results" },
+  {
+    icon: <SchMgtMenuIcon />,
+    name: "Results",
+    link: "school-management/results",
+  },
 ];
 
 // Non-academic staff — own record only, until we define more
@@ -54,8 +70,22 @@ const StaffMenuLinks: MenuItem[] = [
   { icon: <SupportIcon />, name: "Support", link: "support" },
 ];
 
+const StudentMenuLinks: MenuItem[] = [
+  { icon: <DashboardMenuIcon />, name: "Dashboard", link: "/" },
+  { icon: <SchMgtMenuIcon />, name: "My results", link: "my-results" },
+  { icon: <StudMgtMenuIcon />, name: "My attendance", link: "my-attendance" },
+  {
+    icon: <StaffMgtMenuIcon />,
+    name: "My profile",
+    link: "my-student-profile",
+  },
+  { icon: <SupportIcon />, name: "Support", link: "support" },
+];
+
 export const getMenuLinks = (role: string, isAcademic: boolean): MenuItem[] => {
   if (role === "super admin" || role === "admin") return AdminMenuLinks;
+  if (role === "student") return StudentMenuLinks;
+  // if (role === "parent") return ParentMenuLinks; // when we build it
   return isAcademic ? TeacherMenuLinks : StaffMenuLinks;
 };
 

@@ -13,6 +13,7 @@ import TeacherDashboard from "../../Pages/Dashboard/Teacher";
 import { logout } from "../../redux/slice/userSlice";
 import { useSelector } from "react-redux";
 import usePermissions from "../../hooks/usePermissions";
+import StudentDashboard from "../../Pages/Dashboard/Student";
 
 export default function DashboardLayout() {
   const [pageTitle, setPageTitle] = useState("");
@@ -36,24 +37,24 @@ export default function DashboardLayout() {
   // Auto-set page title from URL if not already set
   useEffect(() => {
     const pathMap: Record<string, string> = {
-      '/school-management/academics': 'Academics',
-      '/school-management/admission': 'Admission',
-      '/school-management/attendance': 'Attendance',
-      '/school-management/fee-management': 'Fee Management',
-      '/school-management/inventory': 'Inventory',
-      '/staff-management': 'Staff Management',
-      '/student-management': 'Student Management',
-      '/settings': 'Settings',
-      '/support': 'Support',
-      '/': 'Dashboard',
+      "/school-management/academics": "Academics",
+      "/school-management/admission": "Admission",
+      "/school-management/attendance": "Attendance",
+      "/school-management/fee-management": "Fee Management",
+      "/school-management/inventory": "Inventory",
+      "/staff-management": "Staff Management",
+      "/student-management": "Student Management",
+      "/settings": "Settings",
+      "/support": "Support",
+      "/": "Dashboard",
     };
-    const matchedTitle = Object.entries(pathMap).find(([path]) => 
-      location.pathname.startsWith(path) && path !== '/'
+    const matchedTitle = Object.entries(pathMap).find(
+      ([path]) => location.pathname.startsWith(path) && path !== "/",
     );
     if (matchedTitle) {
       setPageTitle(matchedTitle[1]);
-    } else if (location.pathname === '/') {
-      setPageTitle('Dashboard');
+    } else if (location.pathname === "/") {
+      setPageTitle("Dashboard");
     }
   }, [location.pathname]);
 
@@ -80,13 +81,14 @@ export default function DashboardLayout() {
   const menuLinks = getMenuLinks(role, userData?.staffType === "academic");
 
   // Display name based on role
-  const displayName = role === "super admin"
-    ? "Super Admin"
-    : role === "admin"
-    ? "Admin"
-    : userData?.firstName
-    ? `${userData.firstName} ${userData.surname || ""}`.trim()
-    : "Staff";
+  const displayName =
+    role === "super admin"
+      ? "Super Admin"
+      : role === "admin"
+        ? "Admin"
+        : userData?.firstName
+          ? `${userData.firstName} ${userData.surname || ""}`.trim()
+          : "Staff";
 
   return (
     <div className="max-h-screen overflow-hidden py-5 pr-0 flex items-stretch">
@@ -104,93 +106,108 @@ export default function DashboardLayout() {
             className="ml-[34px] mt-7 mb-[30px] h-[52px] w-[52px]"
           />
           <div className="flex flex-col ml-3">
-            <p className="font-semibold text-lg text-black leading-tight">{displayName}</p>
-            <p className="text-xs text-gray-400 capitalize">{role || "staff"}</p>
+            <p className="font-semibold text-lg text-black leading-tight">
+              {displayName}
+            </p>
+            <p className="text-xs text-gray-400 capitalize">
+              {role || "staff"}
+            </p>
           </div>
         </div>
 
         <div className="flex flex-col justify-between h-full">
           <div className="flex-1 overflow-y-auto">
             <ul className="flex flex-col gap-y-6 text-text-sec">
-              {menuLinks.filter((menu) => {
-                if (menu.name === "School Management") return permissions.canAccessSchoolManagement;
-                if (menu.name === "Staff Management") return permissions.canAccessStaffManagement;
-                if (menu.name === "Student Management") return permissions.canAccessStudentManagement;
-                if (menu.name === "Settings") return permissions.canAccessSettings;
-                return true;
-              }).map((menu, i) =>
-                menu.name === "School Management" ? (
-                  <div key={i}>
-                    <div className="flex flex-row gap-x-5">
-                      <span
-                        className={`${
-                          isSchoolManagementActive
-                            ? "bg-tertiary"
-                            : "bg-transparent"
-                        } h-[45px] w-[20px] rounded-s-none rounded-[10px]`}
-                      ></span>
-                      <button
-                        ref={dropdownRef}
-                        className={`flex items-center gap-x-4 w-full rounded-[5px] p-2 ${
-                          isSchoolManagementActive
-                            ? "bg-tertiary text-white"
-                            : "text-text-sec hover:text-white hover:bg-tertiary"
-                        }`}
-                        onClick={() => setSchMgtDropdown(!schMgtDropdown)}
-                      >
-                        {menu.icon} {menu.name}
-                      </button>
-                    </div>
-                    <ul
-                      className={`mt-5 flex-col gap-y-[13px] pl-9 duration-150 transition-all ${
-                        schMgtDropdown ? "flex" : "hidden"
-                      }`}
-                    >
-                      {menu.sublinks?.filter((sublink) => {
-  if (sublink.name === "Admission") return permissions.canAccessAdmission;
-  if (sublink.name === "Fee Management") return permissions.canAccessFeeManagement;
-  if (sublink.name === "Inventory") return permissions.canAccessInventory;
-  return true;
-}).map((sublink, i) => (
-                        <li
-                          key={i}
-                          onClick={() => {
-                            setIsSideBarOpen(!isSideBarOpen);
-                            setPageTitle(sublink.name);
-                          }}
+              {menuLinks
+                .filter((menu) => {
+                  if (menu.name === "School Management")
+                    return permissions.canAccessSchoolManagement;
+                  if (menu.name === "Staff Management")
+                    return permissions.canAccessStaffManagement;
+                  if (menu.name === "Student Management")
+                    return permissions.canAccessStudentManagement;
+                  if (menu.name === "Settings")
+                    return permissions.canAccessSettings;
+                  return true;
+                })
+                .map((menu, i) =>
+                  menu.name === "School Management" ? (
+                    <div key={i}>
+                      <div className="flex flex-row gap-x-5">
+                        <span
+                          className={`${
+                            isSchoolManagementActive
+                              ? "bg-tertiary"
+                              : "bg-transparent"
+                          } h-[45px] w-[20px] rounded-s-none rounded-[10px]`}
+                        ></span>
+                        <button
+                          ref={dropdownRef}
+                          className={`flex items-center gap-x-4 w-full rounded-[5px] p-2 ${
+                            isSchoolManagementActive
+                              ? "bg-tertiary text-white"
+                              : "text-text-sec hover:text-white hover:bg-tertiary"
+                          }`}
+                          onClick={() => setSchMgtDropdown(!schMgtDropdown)}
                         >
-                          <Link
-                            to={`/${menu.link}/${sublink.link}`}
-                            className={`w-full py-2.5 px-11 text-sm hover:text-tertiary ${
-                              location.pathname ===
-                              `/${menu.link}/${sublink.link}`
-                                ? "text-tertiary"
-                                : "text-sec"
-                            }`}
-                          >
-                            {sublink.name}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : (
-                  <li
-                    key={i}
-                    className="flex flex-row gap-x-5"
-                    onClick={() => {
-                      setIsSideBarOpen(false);
-                      setPageTitle(menu.name);
-                    }}
-                  >
-                    <CustomLink
-                      to={menu.link}
-                      icon={menu.icon}
-                      name={menu.name}
-                    />
-                  </li>
-                )
-              )}
+                          {menu.icon} {menu.name}
+                        </button>
+                      </div>
+                      <ul
+                        className={`mt-5 flex-col gap-y-[13px] pl-9 duration-150 transition-all ${
+                          schMgtDropdown ? "flex" : "hidden"
+                        }`}
+                      >
+                        {menu.sublinks
+                          ?.filter((sublink) => {
+                            if (sublink.name === "Admission")
+                              return permissions.canAccessAdmission;
+                            if (sublink.name === "Fee Management")
+                              return permissions.canAccessFeeManagement;
+                            if (sublink.name === "Inventory")
+                              return permissions.canAccessInventory;
+                            return true;
+                          })
+                          .map((sublink, i) => (
+                            <li
+                              key={i}
+                              onClick={() => {
+                                setIsSideBarOpen(!isSideBarOpen);
+                                setPageTitle(sublink.name);
+                              }}
+                            >
+                              <Link
+                                to={`/${menu.link}/${sublink.link}`}
+                                className={`w-full py-2.5 px-11 text-sm hover:text-tertiary ${
+                                  location.pathname ===
+                                  `/${menu.link}/${sublink.link}`
+                                    ? "text-tertiary"
+                                    : "text-sec"
+                                }`}
+                              >
+                                {sublink.name}
+                              </Link>
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <li
+                      key={i}
+                      className="flex flex-row gap-x-5"
+                      onClick={() => {
+                        setIsSideBarOpen(false);
+                        setPageTitle(menu.name);
+                      }}
+                    >
+                      <CustomLink
+                        to={menu.link}
+                        icon={menu.icon}
+                        name={menu.name}
+                      />
+                    </li>
+                  ),
+                )}
             </ul>
           </div>
           <div className="mt-auto pb-8">
@@ -235,9 +252,9 @@ export default function DashboardLayout() {
         </nav>
         <div
           ref={scrollRef}
-          className={`lg:border border-[#DEE0E0] rounded-[20px] flex-grow py-6 px-[18px] w-full md:w-[99%] relative ${
-            location.pathname.includes("/support")
-          }`}
+          className={`lg:border border-[#DEE0E0] rounded-[20px] flex-grow py-6 px-[18px] w-full md:w-[99%] relative ${location.pathname.includes(
+            "/support",
+          )}`}
         >
           <div className="flex flex-col">
             <div className="flex items-center justify-between mb-9">
@@ -254,6 +271,8 @@ export default function DashboardLayout() {
             </div>
             {location.pathname !== "/" ? (
               <Outlet />
+            ) : role === "student" ? (
+              <StudentDashboard />
             ) : permissions.isTeacher ? (
               <TeacherDashboard />
             ) : (

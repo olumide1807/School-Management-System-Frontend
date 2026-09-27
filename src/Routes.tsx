@@ -20,6 +20,7 @@ import View from "./Pages/Dashboard/SchoolManagement/Academics/tabs/tab2/View";
 import ViewClassLevel from "./Pages/Dashboard/SchoolManagement/Academics/tabs/tab2/ViewClassLevel";
 import Results from "./Pages/Dashboard/Results";
 import ChangePassword from "./Pages/Auth/ChangePassword";
+import StudentResults from "./Pages/Dashboard/Student/Results";
 
 import { useDispatch, useSelector } from "react-redux";
 import DashboardLayout from "./Templates/DashboardLayout/index";
@@ -213,6 +214,7 @@ function AllRoutes() {
         <Route path="grading" element={<Grading />} />
         <Route path="my-students" element={<MyStudents />} />
         <Route path="my-profile" element={<ViewStaffProfile />} />
+        <Route path="my-results" element={<StudentResults />} />
         <Route path="support" element={<Support />} />
         <Route path="settings" element={permissions.canAccessSettings ? <Settings /> : <Navigate to="/" />} />
       </Route>
