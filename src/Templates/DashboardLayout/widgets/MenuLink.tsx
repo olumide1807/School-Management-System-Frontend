@@ -82,10 +82,16 @@ const StudentMenuLinks: MenuItem[] = [
   { icon: <SupportIcon />, name: "Support", link: "support" },
 ];
 
+const ParentMenuLinks: MenuItem[] = [
+  { icon: <DashboardMenuIcon />, name: "My children", link: "/" },
+  { icon: <StaffMgtMenuIcon />, name: "My details", link: "my-parent-profile" },
+  { icon: <SupportIcon />, name: "Support", link: "support" },
+];
+
 export const getMenuLinks = (role: string, isAcademic: boolean): MenuItem[] => {
   if (role === "super admin" || role === "admin") return AdminMenuLinks;
   if (role === "student") return StudentMenuLinks;
-  // if (role === "parent") return ParentMenuLinks; // when we build it
+  if (role === "parent") return ParentMenuLinks; // when we build it
   return isAcademic ? TeacherMenuLinks : StaffMenuLinks;
 };
 

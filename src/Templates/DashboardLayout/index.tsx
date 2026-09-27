@@ -14,6 +14,7 @@ import { logout } from "../../redux/slice/userSlice";
 import { useSelector } from "react-redux";
 import usePermissions from "../../hooks/usePermissions";
 import StudentDashboard from "../../Pages/Dashboard/Student";
+import ParentDashboard from "../../Pages/Dashboard/Parent";
 
 export default function DashboardLayout() {
   const [pageTitle, setPageTitle] = useState("");
@@ -271,6 +272,8 @@ export default function DashboardLayout() {
             </div>
             {location.pathname !== "/" ? (
               <Outlet />
+            ) : role === "parent" ? (
+              <ParentDashboard />
             ) : role === "student" ? (
               <StudentDashboard />
             ) : permissions.isTeacher ? (
