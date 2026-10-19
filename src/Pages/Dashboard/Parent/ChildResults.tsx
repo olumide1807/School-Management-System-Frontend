@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import SERVER from "../../../Utils/server";
 import Loader from "../../loaders/Loader";
 import ResultsView from "../Student/ResultsView";
-import ChildPage, { firstNameOf, isNotFound } from "./ChildPage";
+import ChildPage, { ChildNotFound, firstNameOf, isNotFound } from "./ChildPage";
 
 function ChildResultsBody({ childId, name }: { childId: string; name: string }) {
   const [selected, setSelected] = useState(""); // "termId:sessionId"
@@ -34,11 +34,9 @@ function ChildResultsBody({ childId, name }: { childId: string; name: string }) 
   });
 
   if (isPending) return <Loader />;
+  if (isNotFound(error)) return <ChildNotFound />;
 
-  // The page frame has already confirmed this is the parent's child, so a
-  // 404 here is usually "no result for this child in that term" rather
-  // than a guardianship failure — say that rather than "not found"
-  if (isError && !isNotFound(error)) {
+  if (isError) {
     return (
       <div className="max-w-[520px] py-6">
         <h2 className="text-lg font-semibold text-secondary">
@@ -46,18 +44,6 @@ function ChildResultsBody({ childId, name }: { childId: string; name: string }) 
         </h2>
         <p className="mt-2 text-sm text-gray-1">
           Please try again, or let the school know if this keeps happening.
-        </p>
-      </div>
-    );
-  }
-  if (isError) {
-    return (
-      <div className="max-w-[520px] py-6">
-        <h2 className="text-lg font-semibold text-secondary">
-          No result for {name} in this term
-        </h2>
-        <p className="mt-2 text-sm text-gray-1">
-          Contact the school office if you think this is wrong.
         </p>
       </div>
     );

@@ -38,7 +38,7 @@ export default function ResultsView({
   const report = data?.report;
 
   // Nothing released yet — the commonest state for most of a term
-  if (available.length === 0 || !report) {
+  if (available.length === 0) {
     return (
       <div className="max-w-[520px] py-12">
         <h1 className="text-xl font-semibold text-secondary">No results yet</h1>
@@ -47,6 +47,23 @@ export default function ResultsView({
             ? `${childName}'s results appear here once the school releases them.`
             : "Your results appear here once your school releases them."}{" "}
           Teachers are usually still marking until the end of term.
+        </p>
+      </div>
+    );
+  }
+
+  // Released, but this student has no entry in it — waiting won't help.
+  // Usually they moved class, or weren't in the class when it was compiled.
+  if (!report) {
+    return (
+      <div className="max-w-[520px] py-12">
+        <h1 className="text-xl font-semibold text-secondary">
+          {childName ? `${childName}'s result isn't here` : "Your result isn't here"}
+        </h1>
+        <p className="mt-2 text-sm text-gray-1 leading-relaxed">
+          {childName
+            ? `The school has released results for ${childName}'s class, but ${childName} isn't in them. This usually happens after a change of class. Please contact the school office so they can sort it out.`
+            : "Your school has released results for your class, but you aren't in them. This usually happens after a change of class. Please let your form teacher or the school office know so they can sort it out."}
         </p>
       </div>
     );
