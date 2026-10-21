@@ -10,7 +10,8 @@ const fmtDate = (d?: string) =>
       })
     : "—";
 
-const Row = ({ label, value }: { label: string; value?: string | null }) => (
+// Exported so the parent's own profile renders rows identically
+export const Row = ({ label, value }: { label: string; value?: string | null }) => (
   <div className="flex flex-wrap items-baseline justify-between gap-2 py-3 border-b border-[#EFF5F8] last:border-b-0">
     <span className="text-[13px] text-text-ter">{label}</span>
     <span className="text-sm text-text-pry">{value || "—"}</span>

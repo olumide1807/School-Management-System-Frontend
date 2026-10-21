@@ -91,7 +91,7 @@ const ParentMenuLinks: MenuItem[] = [
 export const getMenuLinks = (role: string, isAcademic: boolean): MenuItem[] => {
   if (role === "super admin" || role === "admin") return AdminMenuLinks;
   if (role === "student") return StudentMenuLinks;
-  if (role === "parent") return ParentMenuLinks; // when we build it
+  if (role === "parent") return ParentMenuLinks;
   return isAcademic ? TeacherMenuLinks : StaffMenuLinks;
 };
 
