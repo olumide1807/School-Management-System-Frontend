@@ -22,6 +22,8 @@ import { toastOptions } from "../../../Utils/toastOptions";
 import { useNavigate } from "react-router-dom";
 import Loader from "../../loaders/Loader";
 import { printStudentIdCard } from "./printStudentIdCard";
+import usePermissions from "../../../hooks/usePermissions";
+import ResetPasswordDialog, { type ResetTarget } from "./ResetPasswordDialog";
 
 const TABS = ["Students", "Parents/Guardians"];
 
@@ -64,6 +66,8 @@ export default function StudentManagement() {
 // ============================================================
 function StudentListTab() {
   const navigate = useNavigate();
+  const { canResetPasswords } = usePermissions();
+  const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterClass, setFilterClass] = useState("All");
@@ -308,6 +312,21 @@ function StudentListTab() {
             });
           },
         },
+        // Admins only — teachers can open this page too
+        ...(canResetPasswords
+          ? [
+              {
+                name: "Reset password",
+                handleClick: (row: any) =>
+                  setResetTarget({
+                    kind: "student",
+                    id: row._raw._id,
+                    name: `${row._raw.firstName || ""} ${row._raw.surName || ""}`.trim(),
+                    shortName: row._raw.firstName || "this student",
+                  }),
+              },
+            ]
+          : []),
       ],
     },
   ];
@@ -470,6 +489,11 @@ function StudentListTab() {
           message="No students found"
         />
       )}
+
+      <ResetPasswordDialog
+        target={resetTarget}
+        onClose={() => setResetTarget(null)}
+      />
     </>
   );
 }
@@ -480,6 +504,8 @@ function StudentListTab() {
 function ParentListTab() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const { canResetPasswords } = usePermissions();
+  const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
 
   const { data: parentsData, isPending } = useQuery({
     queryKey: ["all-parents"],
@@ -563,6 +589,27 @@ function ParentListTab() {
           handleClick: (row: any) =>
             navigate(`/student-management/parent-profile/${row._raw._id}`),
         },
+        // Admins only — teachers can open this page too
+        ...(canResetPasswords
+          ? [
+              {
+                name: "Reset password",
+                handleClick: (row: any) =>
+                  setResetTarget({
+                    kind: "parent",
+                    id: row._raw._id,
+                    name: [row._raw.title, row._raw.firstName, row._raw.surName]
+                      .filter(Boolean)
+                      .join(" "),
+                    // "Mrs Ade" — how a school addresses a parent
+                    shortName:
+                      row._raw.title && row._raw.surName
+                        ? `${row._raw.title} ${row._raw.surName}`
+                        : row._raw.firstName || "this parent",
+                  }),
+              },
+            ]
+          : []),
       ],
     },
   ];
@@ -620,6 +667,11 @@ function ParentListTab() {
           message="No parents match your search"
         />
       )}
+
+      <ResetPasswordDialog
+        target={resetTarget}
+        onClose={() => setResetTarget(null)}
+      />
     </>
   );
 }

@@ -26,6 +26,7 @@ interface Permissions {
   canRecordPayments: boolean;
   canMarkAttendance: boolean;
   canViewAllClasses: boolean; // false for teachers (only their class)
+  canResetPasswords: boolean; // student and parent portal passwords
 }
 
 export const usePermissions = (): Permissions => {
@@ -63,6 +64,7 @@ export const usePermissions = (): Permissions => {
     canRecordPayments: isSuperAdmin || isAdmin,
     canMarkAttendance: isSuperAdmin || isAdmin || isTeacher,
     canViewAllClasses: isSuperAdmin || isAdmin, // teachers only see their class
+    canResetPasswords: isSuperAdmin || isAdmin,
   };
 };
 
