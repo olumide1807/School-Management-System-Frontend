@@ -101,6 +101,11 @@ export default function ResetPasswordDialog({
             >
               {password}
             </p>
+            {/* Generated passwords are capitals only and sign-in is
+                case-sensitive — worth saying when reading it out */}
+            <p className="mt-3 text-[13px] text-gray-1">
+              All capitals — type it exactly as shown.
+            </p>
           </div>
 
           <Button
