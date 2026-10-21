@@ -27,6 +27,7 @@ import ChildProfile from "./Pages/Dashboard/Parent/ChildProfile";
 import ChildResults from "./Pages/Dashboard/Parent/ChildResults";
 import ChildAttendance from "./Pages/Dashboard/Parent/ChildAttendance";
 import ParentProfile from "./Pages/Dashboard/Parent/Profile";
+import DashboardNotFound from "./Pages/Dashboard/NotFound";
 
 import { useDispatch, useSelector } from "react-redux";
 import DashboardLayout from "./Templates/DashboardLayout/index";
@@ -229,6 +230,8 @@ function AllRoutes() {
         <Route path="my-parent-profile" element={<ParentProfile />} />
         <Route path="support" element={<Support />} />
         <Route path="settings" element={permissions.canAccessSettings ? <Settings /> : <Navigate to="/" />} />
+        {/* Anything unmatched inside the dashboard: say so, keep the sidebar */}
+        <Route path="*" element={<DashboardNotFound />} />
       </Route>
 
       {/* Auth Screens - redirect to / if already logged in */}
