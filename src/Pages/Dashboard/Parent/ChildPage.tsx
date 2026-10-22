@@ -36,6 +36,7 @@ export const firstNameOf = (child: any) => child?.firstName || "your child";
 const SECTIONS = [
   { key: "results", label: "Results" },
   { key: "attendance", label: "Attendance" },
+  { key: "fees", label: "Fees" },
   { key: "profile", label: "Details" },
 ] as const;
 

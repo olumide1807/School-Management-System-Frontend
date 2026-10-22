@@ -26,6 +26,7 @@ import StudentProfile from "./Pages/Dashboard/Student/Profile";
 import ChildProfile from "./Pages/Dashboard/Parent/ChildProfile";
 import ChildResults from "./Pages/Dashboard/Parent/ChildResults";
 import ChildAttendance from "./Pages/Dashboard/Parent/ChildAttendance";
+import ChildFees from "./Pages/Dashboard/Parent/ChildFees";
 import ParentProfile from "./Pages/Dashboard/Parent/Profile";
 import DashboardNotFound from "./Pages/Dashboard/NotFound";
 
@@ -227,6 +228,7 @@ function AllRoutes() {
         <Route path="child/:childId/profile" element={<ChildProfile />} />
         <Route path="child/:childId/results" element={<ChildResults />} />
         <Route path="child/:childId/attendance" element={<ChildAttendance />} />
+        <Route path="child/:childId/fees" element={<ChildFees />} />
         <Route path="my-parent-profile" element={<ParentProfile />} />
         <Route path="support" element={<Support />} />
         <Route path="settings" element={permissions.canAccessSettings ? <Settings /> : <Navigate to="/" />} />
