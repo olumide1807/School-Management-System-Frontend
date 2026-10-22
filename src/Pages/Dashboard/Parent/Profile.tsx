@@ -6,12 +6,9 @@ import SERVER from "../../../Utils/server";
 import Loader from "../../loaders/Loader";
 import { Row } from "../Student/ProfileView";
 
-// The parent model stores homeAddress as a string, but parent creation
-// sends an `address` object the schema doesn't have, so today neither is
-// ever saved and this shows "—". Accept both so the row fills in whichever
-// way the backend is fixed.
+// The same address object students have. Parents created before the
+// backend stored it have none, and show "—".
 const formatAddress = (parent: any): string | null => {
-  if (parent.homeAddress) return parent.homeAddress;
   const a = parent.address;
   if (!a || typeof a !== "object") return null;
   const line = [[a.number, a.street].filter(Boolean).join(" "), a.city, a.state, a.country]
