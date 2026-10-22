@@ -272,7 +272,10 @@ export default function FeeManagement() {
   };
 
   const handlePreview = () => {
-    if (!selectedTermId || selectedArmIds.length === 0 || feeItems.some(f => !f.description || !f.amount)) {
+    // Empty, not falsy: amounts from a stored fee are numbers, and a ₦0
+    // item is a valid amount that must not block the form
+    const isEmpty = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
+    if (!selectedTermId || selectedArmIds.length === 0 || feeItems.some(f => !f.description || isEmpty(f.amount))) {
       toast.error("Fill all fields", toastOptions); return;
     }
     setOpenPreview(true);
