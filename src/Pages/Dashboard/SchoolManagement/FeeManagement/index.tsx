@@ -50,7 +50,9 @@ export default function FeeManagement() {
 
   const [paymentStudentId, setPaymentStudentId] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
+  // No default: a forgotten change would record a transfer as cash, and
+  // the parent sees the method on their fees page
+  const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentRef, setPaymentRef] = useState("");
   const [paymentDate, setPaymentDate] = useState(localToday());
   const [recordingPayment, setRecordingPayment] = useState(false);
@@ -341,6 +343,9 @@ export default function FeeManagement() {
     if (!studentFee) {
       toast.error("No fee found for this student's class arm", toastOptions); return;
     }
+    if (!paymentMethod) {
+      toast.error("Choose how the payment was made", toastOptions); return;
+    }
     // The date input's max stops the picker, not a typed date
     if (!paymentDate || paymentDate > localToday()) {
       toast.error("Choose the date the payment was received — it can't be in the future", toastOptions); return;
@@ -362,7 +367,7 @@ export default function FeeManagement() {
       toast.success('Payment recorded!', toastOptions);
       queryClient.invalidateQueries({ queryKey: ['fee-payments-level'] });
       queryClient.invalidateQueries({ queryKey: ['all-fees'] });
-      setPaymentStudentId(""); setPaymentAmount(""); setPaymentRef(""); setPaymentDate(localToday());
+      setPaymentStudentId(""); setPaymentAmount(""); setPaymentRef(""); setPaymentDate(localToday()); setPaymentMethod("");
       setOpenRecordPayment(false);
       setOpenReceipt(true);
     } catch (error: any) {
@@ -674,7 +679,7 @@ export default function FeeManagement() {
       </Modal>
 
       {/* Record Payment */}
-      <Modal openModal={openRecordPayment} closeModal={() => { setOpenRecordPayment(false); setPaymentStudentId(""); setPaymentAmount(""); setPaymentDate(localToday()); }}
+      <Modal openModal={openRecordPayment} closeModal={() => { setOpenRecordPayment(false); setPaymentStudentId(""); setPaymentAmount(""); setPaymentDate(localToday()); setPaymentMethod(""); }}
         title="Record Payment">
         <div className="flex flex-col gap-y-5">
           {/* The term comes from the page's term filter. Say so here, where
@@ -731,10 +736,25 @@ export default function FeeManagement() {
                 className="border border-gray-300 rounded-lg p-2.5 text-sm" placeholder="Amount" />
             </div>
             <FormControl size="small">
-              <InputLabel>Method</InputLabel>
-              <Select value={paymentMethod} label="Method" onChange={(e) => setPaymentMethod(e.target.value)} sx={{ borderRadius: "10px" }}>
+              <InputLabel shrink id="payment-method-label">Method *</InputLabel>
+              <Select
+                labelId="payment-method-label"
+                value={paymentMethod}
+                label="Method *"
+                notched
+                displayEmpty
+                renderValue={(v) =>
+                  v ? (
+                    { cash: "Cash", "bank transfer": "Bank transfer", card: "Card" }[v as string] || v
+                  ) : (
+                    <span className="text-gray-400">Choose how it was paid</span>
+                  )
+                }
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                sx={{ borderRadius: "10px" }}
+              >
+                <MenuItem value="bank transfer">Bank transfer</MenuItem>
                 <MenuItem value="cash">Cash</MenuItem>
-                <MenuItem value="bank transfer">Bank Transfer</MenuItem>
                 <MenuItem value="card">Card</MenuItem>
               </Select>
             </FormControl>
