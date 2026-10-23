@@ -6,6 +6,7 @@ import { login } from "../../redux/apiCall";
 import { useDispatch, useSelector } from "react-redux";
 import InputField from "../../Components/Forms/InputField";
 import LoaderOverlay from "./Loader";
+import { UNREACHABLE_MESSAGE } from "../../Utils/requestFailure";
 
 type AccountType = "staff" | "parent" | "student";
 
@@ -21,10 +22,25 @@ export default function Login() {
   const [studentID, setStudentID] = useState("");
   const [password, setPassword] = useState("");
 
-  const { loading, error } = useSelector((state: any) => state.user);
+  const { loading, error, errorKind, errorMessage } = useSelector((state: any) => state.user);
   const dispatch = useDispatch();
 
   const isStudent = accountType === "student";
+
+  const credentialsText = isStudent
+    ? "Please enter a valid student ID and password"
+    : "Please enter a valid email and password";
+
+  // Only a 401 means what they typed is wrong. An outage, a timeout or a
+  // server error must not send them off re-checking their password.
+  const failureText =
+    errorKind === "credentials"
+      ? credentialsText
+      : errorKind === "unreachable"
+        ? UNREACHABLE_MESSAGE
+        : errorKind === "rejected"
+          ? errorMessage || credentialsText
+          : "Something went wrong signing in. Please try again shortly.";
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
@@ -123,15 +139,7 @@ export default function Login() {
             <div className="mt-[10px]">
               <Button text="Login" type="submit" loading={loading} onClick={() => {}} />
 
-              {error === true && (
-                <ErrorMsg
-                  text={
-                    isStudent
-                      ? "Please enter a valid student ID and password"
-                      : "Please enter a valid email and password"
-                  }
-                />
-              )}
+              {error === true && <ErrorMsg text={failureText} />}
             </div>
           </form>
         </div>

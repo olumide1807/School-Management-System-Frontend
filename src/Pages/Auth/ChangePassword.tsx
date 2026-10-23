@@ -4,6 +4,12 @@ import Button from "../../Components/Forms/Button";
 import InputField from "../../Components/Forms/InputField";
 import { ErrorMsg } from "../../Components/Forms";
 import SERVER from "../../Utils/server";
+import {
+  INTERACTIVE_TIMEOUT_MS,
+  UNREACHABLE_MESSAGE,
+  isUnreachable,
+  serverMessage,
+} from "../../Utils/requestFailure";
 import { Logout } from "../../redux/apiCall";
 import { useDispatch } from "react-redux";
 
@@ -34,11 +40,21 @@ export default function ChangePassword() {
 
     setSaving(true);
     try {
-      await SERVER.put("auth/change-password", { currentPassword, newPassword });
+      await SERVER.put(
+        "auth/change-password",
+        { currentPassword, newPassword },
+        { timeout: INTERACTIVE_TIMEOUT_MS },
+      );
       sessionStorage.setItem("mustChangePassword", "false");
       window.location.replace("/");
     } catch (err: any) {
-      setError(err?.response?.data?.error || "Could not change your password");
+      // An outage or server error isn't the password's fault — don't show
+      // the server's raw 5xx text or imply they typed something wrong
+      setError(
+        isUnreachable(err)
+          ? UNREACHABLE_MESSAGE
+          : serverMessage(err) || "Could not change your password",
+      );
     } finally {
       setSaving(false);
     }

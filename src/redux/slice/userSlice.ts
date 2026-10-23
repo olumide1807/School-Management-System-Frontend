@@ -7,6 +7,10 @@ const initialState = {
     user: JSON.parse(sessionStorage.getItem("userData") || "null"),
     loading: false,
     error: false,
+    // Why the last sign-in failed (see LoginFailureKind in apiCall), and
+    // the server's own message when it sent one
+    errorKind: null as string | null,
+    errorMessage: null as string | null,
 };
 
 const userSlice = createSlice({
@@ -16,6 +20,8 @@ const userSlice = createSlice({
         loginStart: (state) => {
             state.loading = true;
             state.error = false;
+            state.errorKind = null;
+            state.errorMessage = null;
         },
         loginSuccess: (state, action) => {
             state.loading = false;
@@ -25,9 +31,11 @@ const userSlice = createSlice({
             state.user = action.payload.user;
             state.error = false;
         },
-        loginFailure: (state) => {
+        loginFailure: (state, action) => {
             state.loading = false;
             state.error = true;
+            state.errorKind = action.payload?.kind ?? "unexpected";
+            state.errorMessage = action.payload?.message ?? null;
         },
         logout: (state) => {
             state.currentUser = null;
@@ -36,6 +44,8 @@ const userSlice = createSlice({
             state.user = null;
             state.loading = false;
             state.error = false;
+            state.errorKind = null;
+            state.errorMessage = null;
             sessionStorage.removeItem("token");
             sessionStorage.removeItem("userRole");
             sessionStorage.removeItem("userData");
