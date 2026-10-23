@@ -22,31 +22,40 @@ import { toast } from "react-toastify";
 import { toastOptions } from "../../Utils/toastOptions";
 import Loader from "../loaders/Loader";
 import { useSessionTerm } from "../../services/api-call";
+import usePermissions from "../../hooks/usePermissions";
 
-const TABS = [
-  "My Profile",
-  "School Details",
-  "Academic Settings",
-  "Fees & IDs",
-  "Notifications",
-  "Change Password",
+// superAdminOnly tabs aren't rendered at all for an admin, so their
+// super-admin endpoints are never called. Admins reach this page only for
+// Bank Details.
+const TABS: { label: string; Component: () => JSX.Element; superAdminOnly: boolean }[] = [
+  { label: "My Profile", Component: MyProfileTab, superAdminOnly: true },
+  { label: "School Details", Component: SchoolDetailsTab, superAdminOnly: true },
+  { label: "Academic Settings", Component: AcademicSettingsTab, superAdminOnly: true },
+  { label: "Fees & IDs", Component: FeesAndIdsTab, superAdminOnly: true },
+  { label: "Bank Details", Component: BankDetailsTab, superAdminOnly: false },
+  { label: "Notifications", Component: NotificationsTab, superAdminOnly: true },
+  { label: "Change Password", Component: ChangePasswordTab, superAdminOnly: true },
 ];
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState(0);
+  const { isSuperAdmin } = usePermissions();
+  const tabs = TABS.filter((t) => isSuperAdmin || !t.superAdminOnly);
 
   return (
     <div className="max-w-[800px]">
       <h1 className="text-2xl font-bold text-black mb-1">Settings</h1>
       <p className="text-sm text-gray-500 mb-6">
-        Manage your profile, school, and system preferences
+        {isSuperAdmin
+          ? "Manage your profile, school, and system preferences"
+          : "Where parents should pay school fees"}
       </p>
 
       <div className="border-b border-gray-200 mb-6 overflow-x-auto">
         <div className="flex gap-1 min-w-max">
-          {TABS.map((tab, i) => (
+          {tabs.map((tab, i) => (
             <button
-              key={i}
+              key={tab.label}
               onClick={() => setActiveTab(i)}
               className={`px-5 py-3 text-sm font-medium relative whitespace-nowrap ${
                 activeTab === i
@@ -54,7 +63,7 @@ export default function Settings() {
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              {tab}
+              {tab.label}
               {activeTab === i && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-tertiary" />
               )}
@@ -63,23 +72,205 @@ export default function Settings() {
         </div>
       </div>
 
-      <div style={{ display: activeTab === 0 ? "block" : "none" }}>
-        <MyProfileTab />
+      {tabs.map(({ label, Component }, i) => (
+        <div key={label} style={{ display: activeTab === i ? "block" : "none" }}>
+          <Component />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================================================
+// BANK DETAILS TAB
+// Where parents pay fees; shown on the parent fees page. A mistyped
+// account number sends a family's money to a stranger, so the 10-digit
+// rule is shown as they type, a changed number must be typed twice, and
+// the preview shows exactly what parents will see.
+// ============================================================
+const NUBAN = /^\d{10}$/;
+
+function BankDetailsTab() {
+  const queryClient = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [bankName, setBankName] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [confirmNumber, setConfirmNumber] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [savedNumber, setSavedNumber] = useState("");
+
+  const { data: settingsData, isPending } = useQuery({
+    queryKey: ["school-settings"],
+    queryFn: async () => {
+      const res = await SERVER.get("settings");
+      return res?.data;
+    },
+    retry: false,
+  });
+
+  useEffect(() => {
+    const b = settingsData?.data?.bankDetails;
+    if (b) {
+      setBankName(b.bankName || "");
+      setAccountName(b.accountName || "");
+      setAccountNumber(b.accountNumber || "");
+      setSavedNumber(b.accountNumber || "");
+      setInstructions(b.paymentInstructions || "");
+      setConfirmNumber("");
+    }
+  }, [settingsData]);
+
+  const number = accountNumber.trim();
+  const hasNonDigits = /\D/.test(number);
+  const digitCount = number.replace(/\D/g, "").length;
+  const numberValid = number === "" || NUBAN.test(number);
+  const numberChanged = number !== savedNumber;
+  const needsConfirm = numberChanged && number !== "";
+  const confirmMatches = !needsConfirm || confirmNumber.trim() === number;
+  const instructionsTooLong = instructions.length > 500;
+  const canSave = numberValid && confirmMatches && !instructionsTooLong && !saving;
+
+  // What parents will see: only a complete, valid account is shown to them
+  const complete = bankName.trim() && accountName.trim() && NUBAN.test(number);
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      await SERVER.put("settings/bank-details", {
+        bankName: bankName.trim(),
+        accountName: accountName.trim(),
+        accountNumber: number,
+        paymentInstructions: instructions.trim(),
+      });
+      toast.success("Bank details saved", toastOptions);
+      queryClient.invalidateQueries({ queryKey: ["school-settings"] });
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || "Couldn't save the bank details", toastOptions);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (isPending) return <Loader />;
+
+  const field = "border border-gray-300 rounded-lg p-2.5 text-sm w-full";
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="border border-gray-200 rounded-xl p-5 flex flex-col gap-4">
+        <div>
+          <h3 className="font-semibold text-black">Bank account for school fees</h3>
+          <p className="text-sm text-gray-500 mt-1">
+            Parents see these on their child&apos;s Fees page when paying by
+            transfer. Check them carefully.
+          </p>
+        </div>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-gray-500">Bank name</span>
+          <input className={field} value={bankName} maxLength={100}
+            placeholder="e.g. First Bank of Nigeria"
+            onChange={(e) => setBankName(e.target.value)} />
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-gray-500">Account name</span>
+          <input className={field} value={accountName} maxLength={100}
+            placeholder="As it appears on the account"
+            onChange={(e) => setAccountName(e.target.value)} />
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-gray-500">Account number (NUBAN)</span>
+          <input
+            className={`${field} font-mono tracking-[0.15em] ${!numberValid ? "border-red-500" : ""}`}
+            value={accountNumber}
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="10 digits"
+            aria-describedby="account-number-rule"
+            onChange={(e) => setAccountNumber(e.target.value)}
+          />
+          <span
+            id="account-number-rule"
+            className={`text-xs ${number === "" ? "text-gray-500" : numberValid ? "text-green-700" : "text-red-600"}`}
+          >
+            {number === ""
+              ? "Exactly 10 digits, no spaces or dashes."
+              : hasNonDigits
+                ? "Digits only — remove spaces, dashes and letters."
+                : numberValid
+                  ? "10 of 10 digits ✓"
+                  : `${digitCount} of 10 digits`}
+          </span>
+        </label>
+
+        {needsConfirm && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500">Type the account number again</span>
+            <input
+              className={`${field} font-mono tracking-[0.15em] ${confirmNumber && !confirmMatches ? "border-red-500" : ""}`}
+              value={confirmNumber}
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="10 digits"
+              onChange={(e) => setConfirmNumber(e.target.value)}
+              onPaste={(e) => e.preventDefault()}
+            />
+            <span className={`text-xs ${!confirmNumber ? "text-gray-500" : confirmMatches ? "text-green-700" : "text-red-600"}`}>
+              {!confirmNumber
+                ? "Type it rather than pasting, to catch a wrong digit."
+                : confirmMatches
+                  ? "Numbers match ✓"
+                  : "These don't match yet."}
+            </span>
+          </label>
+        )}
+
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-gray-500">Instructions for parents (optional)</span>
+          <textarea className={`${field} resize-none`} rows={3} value={instructions}
+            placeholder="e.g. Use your child's class in the transfer narration, or pay at the bursary on Fridays."
+            onChange={(e) => setInstructions(e.target.value)} />
+          <span className={`text-xs ${instructionsTooLong ? "text-red-600" : "text-gray-500"}`}>
+            {instructions.length} / 500
+          </span>
+        </label>
       </div>
-      <div style={{ display: activeTab === 1 ? "block" : "none" }}>
-        <SchoolDetailsTab />
+
+      {/* Exactly what parents will see */}
+      <div className="rounded-xl bg-gray-50 p-5">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          What parents will see
+        </p>
+        {complete ? (
+          <div className="text-sm text-black flex flex-col gap-1">
+            <p>{bankName.trim()}</p>
+            <p>{accountName.trim()}</p>
+            <p className="font-mono text-lg tracking-[0.15em]">{number}</p>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600">
+            &quot;Payment details are available from the school office.&quot;
+            Parents only see the account once the bank name, account name and a
+            10-digit account number are all filled in.
+          </p>
+        )}
       </div>
-      <div style={{ display: activeTab === 2 ? "block" : "none" }}>
-        <AcademicSettingsTab />
-      </div>
-      <div style={{ display: activeTab === 3 ? "block" : "none" }}>
-        <FeesAndIdsTab />
-      </div>
-      <div style={{ display: activeTab === 4 ? "block" : "none" }}>
-        <NotificationsTab />
-      </div>
-      <div style={{ display: activeTab === 5 ? "block" : "none" }}>
-        <ChangePasswordTab />
+
+      <div className="flex justify-end">
+        <Button
+          variant="contained"
+          color="tertiary"
+          startIcon={<Save />}
+          onClick={handleSave}
+          disabled={!canSave}
+          sx={{ color: "white", borderRadius: "10px", textTransform: "capitalize" }}
+        >
+          {saving ? "Saving..." : "Save bank details"}
+        </Button>
       </div>
     </div>
   );

@@ -231,7 +231,8 @@ function AllRoutes() {
         <Route path="child/:childId/fees" element={<ChildFees />} />
         <Route path="my-parent-profile" element={<ParentProfile />} />
         <Route path="support" element={<Support />} />
-        <Route path="settings" element={permissions.canAccessSettings ? <Settings /> : <Navigate to="/" />} />
+        {/* Admins get in too, but see only the Bank Details tab */}
+        <Route path="settings" element={permissions.canAccessSettings || permissions.canEditBankDetails ? <Settings /> : <Navigate to="/" />} />
         {/* Anything unmatched inside the dashboard: say so, keep the sidebar */}
         <Route path="*" element={<DashboardNotFound />} />
       </Route>
