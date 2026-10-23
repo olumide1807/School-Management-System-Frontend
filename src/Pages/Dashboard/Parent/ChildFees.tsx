@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import SERVER from "../../../Utils/server";
@@ -10,7 +11,8 @@ import ChildPage, { ChildNotFound, firstNameOf, isNotFound } from "./ChildPage";
 //
 // Deliberately factual: an outstanding balance is information, and any
 // figure a parent might question points them to the school office. There
-// is no way to pay from here, and nothing suggests there is.
+// is no way to pay from here, and nothing suggests there is — "How to pay"
+// only says where to transfer to and what reference to quote.
 
 // "₦502,000" for whole amounts, "₦150,000.50" when there are kobo. Uses the
 // fee's own currency rather than assuming naira.
@@ -184,7 +186,123 @@ function Breakdown({ line }: { line: any }) {
   );
 }
 
-function ChildFeesBody({ childId, name }: { childId: string; name: string }) {
+// A copy button for something a parent will retype into a banking app,
+// where one wrong digit sends money to a stranger
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setState("copied");
+    } catch {
+      setState("failed");
+    }
+  };
+  return (
+    <span className="inline-flex items-center gap-2">
+      <button
+        type="button"
+        onClick={copy}
+        className="px-3 py-1.5 rounded-[8px] text-xs text-tertiary border border-[#DEE0E0] hover:border-tertiary transition-colors"
+      >
+        {state === "copied" ? "Copied" : label}
+      </button>
+      {state === "failed" && (
+        <span className="text-xs text-text-ter">Couldn&apos;t copy — please copy it by hand.</span>
+      )}
+    </span>
+  );
+}
+
+// How to pay — information only. Nothing here takes a payment or suggests
+// one can be made on this page.
+function HowToPay({ details, child }: { details: any; child: any }) {
+  const account = details?.bankAccount || null;
+  const instructions = details?.instructions || null;
+  const childName = [child?.firstName, child?.surName].filter(Boolean).join(" ");
+  const reference = [child?.studentID, childName].filter(Boolean).join(" ");
+
+  // No account set: point to the office, never an empty block
+  if (!account) {
+    return (
+      <section className="border border-[#DEE0E0] rounded-[12px] p-5 flex flex-col gap-2">
+        <h2 className="text-base font-semibold text-secondary">How to pay</h2>
+        <p className="text-sm text-text-pry leading-relaxed">
+          Payment details are available from the school office.
+        </p>
+        {instructions && (
+          <p className="text-sm text-text-pry leading-relaxed whitespace-pre-line">{instructions}</p>
+        )}
+        {reference && (
+          <p className="text-sm text-text-pry leading-relaxed">
+            Whichever way you pay, quote <span className="font-medium">{reference}</span> so
+            the school can match the payment to {child?.firstName || "your child"}.
+          </p>
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <section className="border border-[#DEE0E0] rounded-[12px] p-5 flex flex-col gap-4">
+      <div>
+        <h2 className="text-base font-semibold text-secondary">How to pay</h2>
+        <p className="text-sm text-text-pry mt-1 leading-relaxed">
+          To pay by bank transfer, use the school&apos;s account below in your
+          own banking app.
+        </p>
+      </div>
+
+      <div className="rounded-[10px] bg-bg-7 px-4 py-4 flex flex-col gap-3">
+        <div>
+          <p className="text-[13px] text-gray-1">Bank</p>
+          <p className="text-sm text-text-pry">{account.bankName}</p>
+        </div>
+        <div>
+          <p className="text-[13px] text-gray-1">Account name</p>
+          <p className="text-sm text-text-pry">{account.accountName}</p>
+        </div>
+        <div>
+          <p className="text-[13px] text-gray-1">Account number</p>
+          <div className="flex flex-wrap items-center gap-3 mt-0.5">
+            <p className="font-mono text-[22px] leading-none font-semibold text-black tracking-[0.12em] select-all">
+              {account.accountNumber}
+            </p>
+            <CopyButton value={account.accountNumber} label="Copy account number" />
+          </div>
+        </div>
+      </div>
+
+      {reference && (
+        <div>
+          <p className="text-sm text-text-pry leading-relaxed">
+            Put this in the transfer&apos;s narration or reference, so the
+            bursar can match the payment to {child?.firstName || "your child"}:
+          </p>
+          <div className="flex flex-wrap items-center gap-3 mt-2">
+            <p className="text-sm font-medium text-text-pry select-all">{reference}</p>
+            <CopyButton value={reference} label="Copy reference" />
+          </div>
+        </div>
+      )}
+
+      {instructions && (
+        <div>
+          <p className="text-[13px] font-semibold text-secondary">From the school</p>
+          <p className="text-sm text-text-pry mt-1 leading-relaxed whitespace-pre-line">{instructions}</p>
+        </div>
+      )}
+
+      <p className="text-[13px] text-gray-1 leading-relaxed">
+        The school records payments by hand, so it may be a little while before
+        a transfer shows on this page. If it doesn&apos;t appear, the school
+        office can check it against your transfer receipt.
+      </p>
+    </section>
+  );
+}
+
+function ChildFeesBody({ childId, name, child }: { childId: string; name: string; child: any }) {
   // Own key, with childId: same endpoint ⇒ same shape, and no other query
   // uses this prefix
   const { data, isPending, isError, error } = useQuery({
@@ -261,6 +379,9 @@ function ChildFeesBody({ childId, name }: { childId: string; name: string }) {
         )}
       </section>
 
+      {/* ---- How to pay: below the figures ---- */}
+      <HowToPay details={data.paymentDetails} child={child} />
+
       {/* ---- Payments whose fee no longer exists ---- */}
       {unallocated.length > 0 && (
         <section className="border border-[#DEE0E0] rounded-[12px] p-5 flex flex-col gap-3">
@@ -317,7 +438,7 @@ export default function ChildFees() {
   return (
     <ChildPage>
       {({ childId, profile }) => (
-        <ChildFeesBody key={childId} childId={childId} name={firstNameOf(profile.child)} />
+        <ChildFeesBody key={childId} childId={childId} name={firstNameOf(profile.child)} child={profile.child} />
       )}
     </ChildPage>
   );
