@@ -768,10 +768,15 @@ export default function FeeManagement() {
               The day the money arrived, if it wasn&apos;t today. Shown on the receipt and to the parent.
             </span>
           </div>
+          {/* Parents are asked to put the student ID and name in the
+              transfer narration; this is where the bursar copies it */}
           <div className="flex flex-col">
-            <label className="text-xs text-gray-500 mb-1">Reference</label>
+            <label className="text-xs text-gray-500 mb-1">Bank narration or transfer reference</label>
             <input type="text" value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)}
-              className="border border-gray-300 rounded-lg p-2.5 text-sm" placeholder="Receipt/Ref no." />
+              className="border border-gray-300 rounded-lg p-2.5 text-sm" placeholder="e.g. QM/9016 ABDULBASIT ALA" />
+            <span className="text-xs text-gray-500 mt-1">
+              Copy it exactly as it appears, so this payment can be traced back to the bank statement. For cash, use the receipt number.
+            </span>
           </div>
           <Button type="button" color="tertiary" variant="contained" onClick={handleRecordPayment} disabled={recordingPayment}
             sx={{ color: "white", borderRadius: "10px", paddingY: "10px", width: "fit-content" }}>
