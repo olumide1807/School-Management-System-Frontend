@@ -138,6 +138,15 @@ export default function ParentDashboard() {
                     >
                       Attendance
                     </button>
+                    {/* A link only. No balance or status on the card: the
+                        fee data is incomplete by term, and a headline figure
+                        here would be read as the whole picture. */}
+                    <button
+                      onClick={() => navigate(`/child/${child._id}/fees`)}
+                      className="px-4 py-2 rounded-[8px] text-sm text-text-sec border border-[#DEE0E0] hover:border-tertiary transition-colors"
+                    >
+                      Fees
+                    </button>
                     <button
                       onClick={() => navigate(`/child/${child._id}/profile`)}
                       className="px-4 py-2 rounded-[8px] text-sm text-text-sec border border-[#DEE0E0] hover:border-tertiary transition-colors"
