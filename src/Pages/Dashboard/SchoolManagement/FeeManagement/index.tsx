@@ -11,6 +11,7 @@ import { toast } from "react-toastify";
 import { toastOptions } from "../../../../Utils/toastOptions";
 import Loader from "../../../loaders/Loader";
 import { matchStudents, studentLabel } from "./studentSearch";
+import { DuplicateReferenceDialog, ReferenceLookup } from "./PaymentReferenceTools";
 
 const PLATFORM_FEE = { description: "Platform Fee (Basitech)", amount: "2000" };
 
@@ -56,6 +57,8 @@ export default function FeeManagement() {
   const [paymentRef, setPaymentRef] = useState("");
   const [paymentDate, setPaymentDate] = useState(localToday());
   const [recordingPayment, setRecordingPayment] = useState(false);
+  // Set when the backend says the reference is already on record
+  const [duplicateWarning, setDuplicateWarning] = useState<{ duplicates: any[]; pending: any } | null>(null);
   const [lastPayment, setLastPayment] = useState<any>(null);
   const [openReceipt, setOpenReceipt] = useState(false);
 
@@ -350,9 +353,8 @@ export default function FeeManagement() {
     if (!paymentDate || paymentDate > localToday()) {
       toast.error("Choose the date the payment was received — it can't be in the future", toastOptions); return;
     }
-    setRecordingPayment(true);
-    try {
-      const res = await SERVER.post('payment', {
+    await submitPayment({
+      body: {
         studentId: paymentStudentId,
         feeId: studentFee._id,
         amount: paymentAmount,
@@ -361,9 +363,23 @@ export default function FeeManagement() {
         // The day the money arrived, not the day it was entered: it's on
         // the receipt and the parent's fees page
         paymentDate,
-      });
+      },
+      student,
+      studentFee,
+    });
+  };
+
+  // Posts a payment. If the backend says the reference is already on
+  // record (409 DUPLICATE_REFERENCE), nothing is saved and the warning
+  // dialog shows what was recorded; only an explicit confirmation there
+  // resends it with confirmDuplicate: true.
+  const submitPayment = async (pending: { body: any; student: any; studentFee: any }, confirmDuplicate = false) => {
+    setRecordingPayment(true);
+    try {
+      const res = await SERVER.post('payment', confirmDuplicate ? { ...pending.body, confirmDuplicate: true } : pending.body);
       const newPayment = res?.data?.data;
-      setLastPayment({ ...newPayment, student, fee: studentFee });
+      setDuplicateWarning(null);
+      setLastPayment({ ...newPayment, student: pending.student, fee: pending.studentFee });
       toast.success('Payment recorded!', toastOptions);
       queryClient.invalidateQueries({ queryKey: ['fee-payments-level'] });
       queryClient.invalidateQueries({ queryKey: ['all-fees'] });
@@ -371,7 +387,12 @@ export default function FeeManagement() {
       setOpenRecordPayment(false);
       setOpenReceipt(true);
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed', toastOptions);
+      const data = error?.response?.data;
+      if (error?.response?.status === 409 && data?.code === "DUPLICATE_REFERENCE") {
+        setDuplicateWarning({ duplicates: data.duplicates || [], pending });
+      } else {
+        toast.error(data?.error || 'Failed', toastOptions);
+      }
     } finally { setRecordingPayment(false); }
   };
 
@@ -446,6 +467,17 @@ export default function FeeManagement() {
           Create Fee Breakdown
         </Button>
       </div>
+
+      <ReferenceLookup />
+
+      <DuplicateReferenceDialog
+        duplicates={duplicateWarning?.duplicates || null}
+        confirming={recordingPayment}
+        // Cancel leaves the Record Payment form open, so the bursar can
+        // correct the student or reference
+        onCancel={() => setDuplicateWarning(null)}
+        onConfirm={() => duplicateWarning && submitPayment(duplicateWarning.pending, true)}
+      />
 
       <div className="flex items-center gap-4 mb-6">
         <Chip label={activeSession?.sessionName || 'No session'} variant="outlined" />
