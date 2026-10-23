@@ -14,6 +14,21 @@ import { matchStudents, studentLabel } from "./studentSearch";
 
 const PLATFORM_FEE = { description: "Platform Fee (Basitech)", amount: "2000" };
 
+// Today as YYYY-MM-DD in the bursar's own timezone — what a date input
+// holds, and the latest date a payment can have been received
+const localToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+// A payment's date, without a time: the bursar picks a day, not a moment
+const paymentDay = (p: any) =>
+  new Date(p.paymentDate || p.createdAt).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
 export default function FeeManagement() {
   const [openCreate, setOpenCreate] = useState(false);
   const [openPreview, setOpenPreview] = useState(false);
@@ -37,6 +52,7 @@ export default function FeeManagement() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentRef, setPaymentRef] = useState("");
+  const [paymentDate, setPaymentDate] = useState(localToday());
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [lastPayment, setLastPayment] = useState<any>(null);
   const [openReceipt, setOpenReceipt] = useState(false);
@@ -325,6 +341,10 @@ export default function FeeManagement() {
     if (!studentFee) {
       toast.error("No fee found for this student's class arm", toastOptions); return;
     }
+    // The date input's max stops the picker, not a typed date
+    if (!paymentDate || paymentDate > localToday()) {
+      toast.error("Choose the date the payment was received — it can't be in the future", toastOptions); return;
+    }
     setRecordingPayment(true);
     try {
       const res = await SERVER.post('payment', {
@@ -332,14 +352,17 @@ export default function FeeManagement() {
         feeId: studentFee._id,
         amount: paymentAmount,
         paymentMethod,
-        reference: paymentRef
+        reference: paymentRef,
+        // The day the money arrived, not the day it was entered: it's on
+        // the receipt and the parent's fees page
+        paymentDate,
       });
       const newPayment = res?.data?.data;
       setLastPayment({ ...newPayment, student, fee: studentFee });
       toast.success('Payment recorded!', toastOptions);
       queryClient.invalidateQueries({ queryKey: ['fee-payments-level'] });
       queryClient.invalidateQueries({ queryKey: ['all-fees'] });
-      setPaymentStudentId(""); setPaymentAmount(""); setPaymentRef("");
+      setPaymentStudentId(""); setPaymentAmount(""); setPaymentRef(""); setPaymentDate(localToday());
       setOpenRecordPayment(false);
       setOpenReceipt(true);
     } catch (error: any) {
@@ -368,7 +391,7 @@ export default function FeeManagement() {
         <p>Payment Receipt</p>
       </div>
       <div class="row"><span class="label">Receipt No.</span><span class="value">${p.reference || p._id?.slice(-8).toUpperCase() || 'N/A'}</span></div>
-      <div class="row"><span class="label">Date</span><span class="value">${new Date(p.paymentDate || p.createdAt).toLocaleString()}</span></div>
+      <div class="row"><span class="label">Date</span><span class="value">${paymentDay(p)}</span></div>
       <div class="row"><span class="label">Student</span><span class="value">${p.student?.firstName} ${p.student?.surName}</span></div>
       <div class="row"><span class="label">Student ID</span><span class="value">${p.student?.studentID}</span></div>
       <div class="row"><span class="label">Class</span><span class="value">${getArmLabel(p.student?.classArmId)}</span></div>
@@ -651,9 +674,27 @@ export default function FeeManagement() {
       </Modal>
 
       {/* Record Payment */}
-      <Modal openModal={openRecordPayment} closeModal={() => { setOpenRecordPayment(false); setPaymentStudentId(""); setPaymentAmount(""); }}
+      <Modal openModal={openRecordPayment} closeModal={() => { setOpenRecordPayment(false); setPaymentStudentId(""); setPaymentAmount(""); setPaymentDate(localToday()); }}
         title="Record Payment">
         <div className="flex flex-col gap-y-5">
+          {/* The term comes from the page's term filter. Say so here, where
+              the payment is entered, so it can't silently go to the wrong
+              term. */}
+          {selectedFee && (
+            <div className="rounded-lg bg-[#E9FAFF] border border-[#B7E4F3] px-4 py-3">
+              <p className="text-sm text-black">
+                <span className="font-semibold">Recording against: </span>
+                {(() => {
+                  const term = terms.find((t: any) => t._id === selectedFee.termId);
+                  const sessionName = term && activeSession && term.sessionId === activeSession._id ? activeSession.sessionName : "";
+                  return [getTermLabel(selectedFee.termId) || "Unknown term", sessionName].filter(Boolean).join(", ");
+                })()}
+              </p>
+              <p className="text-xs text-gray-600 mt-0.5">
+                To record against a different term, close this and change the term filter at the top of Fee Management.
+              </p>
+            </div>
+          )}
           {/* Searchable by student ID and name, so the ID from a bank
               narration lands on the right child. The ID shows on every
               option: siblings share a surname. */}
@@ -699,6 +740,15 @@ export default function FeeManagement() {
             </FormControl>
           </div>
           <div className="flex flex-col">
+            <label className="text-xs text-gray-500 mb-1">Date received *</label>
+            <input type="date" value={paymentDate} max={localToday()}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              className="border border-gray-300 rounded-lg p-2.5 text-sm w-fit" />
+            <span className="text-xs text-gray-500 mt-1">
+              The day the money arrived, if it wasn&apos;t today. Shown on the receipt and to the parent.
+            </span>
+          </div>
+          <div className="flex flex-col">
             <label className="text-xs text-gray-500 mb-1">Reference</label>
             <input type="text" value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)}
               className="border border-gray-300 rounded-lg p-2.5 text-sm" placeholder="Receipt/Ref no." />
@@ -720,7 +770,7 @@ export default function FeeManagement() {
               <p className="text-xs text-gray-500">Payment Receipt</p>
             </div>
             <div className="flex flex-col gap-2 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Date</span><span className="font-medium">{new Date(lastPayment.paymentDate || lastPayment.createdAt).toLocaleString()}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Date</span><span className="font-medium">{paymentDay(lastPayment)}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Student</span><span className="font-medium">{lastPayment.student?.firstName} {lastPayment.student?.surName}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Student ID</span><span className="font-medium">{lastPayment.student?.studentID}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Class</span><span className="font-medium">{getArmLabel(lastPayment.student?.classArmId)}</span></div>
