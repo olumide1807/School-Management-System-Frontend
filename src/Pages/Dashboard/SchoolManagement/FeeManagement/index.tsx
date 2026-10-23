@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Button, MenuItem, Select, FormControl, InputLabel, IconButton, Chip } from "@mui/material";
+import { Button, MenuItem, Select, FormControl, InputLabel, IconButton, Chip, Autocomplete, TextField } from "@mui/material";
 import { Add, Delete } from "@mui/icons-material";
 import Modal from "../../../../Components/Modals";
 import MessageModal from "../../../../Components/Modals/MessageModal";
@@ -10,6 +10,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { toastOptions } from "../../../../Utils/toastOptions";
 import Loader from "../../../loaders/Loader";
+import { matchStudents, studentLabel } from "./studentSearch";
 
 const PLATFORM_FEE = { description: "Platform Fee (Basitech)", amount: "2000" };
 
@@ -653,12 +654,35 @@ export default function FeeManagement() {
       <Modal openModal={openRecordPayment} closeModal={() => { setOpenRecordPayment(false); setPaymentStudentId(""); setPaymentAmount(""); }}
         title="Record Payment">
         <div className="flex flex-col gap-y-5">
-          <FormControl fullWidth size="small">
-            <InputLabel>Student</InputLabel>
-            <Select value={paymentStudentId} label="Student" onChange={(e) => setPaymentStudentId(e.target.value)} sx={{ borderRadius: "10px" }}>
-              {feeStudents.map((s: any) => <MenuItem key={s._id} value={s._id}>{s.firstName} {s.surName} ({s.studentID})</MenuItem>)}
-            </Select>
-          </FormControl>
+          {/* Searchable by student ID and name, so the ID from a bank
+              narration lands on the right child. The ID shows on every
+              option: siblings share a surname. */}
+          <Autocomplete
+            options={feeStudents}
+            value={feeStudents.find((s: any) => s._id === paymentStudentId) || null}
+            onChange={(_, s: any) => setPaymentStudentId(s?._id || "")}
+            getOptionLabel={(s: any) => studentLabel(s)}
+            isOptionEqualToValue={(a: any, b: any) => a._id === b._id}
+            filterOptions={(opts, { inputValue }) => matchStudents(opts, inputValue)}
+            noOptionsText="No student in this class level matches"
+            renderOption={(props, s: any) => (
+              <li {...props} key={s._id}>
+                <span className="flex w-full items-baseline justify-between gap-3">
+                  <span>{[s.firstName, s.otherName, s.surName].filter(Boolean).join(" ")}</span>
+                  <span className="font-mono text-xs text-gray-600">{s.studentID}</span>
+                </span>
+              </li>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                size="small"
+                label="Student"
+                placeholder="Type a student ID or name, e.g. QM/9016"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+              />
+            )}
+          />
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col">
               <label className="text-xs text-gray-500 mb-1">Amount *</label>
