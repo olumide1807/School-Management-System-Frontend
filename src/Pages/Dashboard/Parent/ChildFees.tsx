@@ -236,7 +236,8 @@ function HowToPay({ details, child }: { details: any; child: any }) {
         {reference && (
           <p className="text-sm text-text-pry leading-relaxed">
             Whichever way you pay, quote <span className="font-medium">{reference}</span> so
-            the school can match the payment to {child?.firstName || "your child"}.
+            the school can match the payment to {child?.firstName || "your child"}. If
+            you&apos;re paying for more than one child, please pay for each separately.
           </p>
         )}
       </section>
@@ -283,6 +284,12 @@ function HowToPay({ details, child }: { details: any; child: any }) {
             <p className="text-sm font-medium text-text-pry select-all">{reference}</p>
             <CopyButton value={reference} label="Copy reference" />
           </div>
+          {/* One narration can only name one child, so a combined
+              transfer can't be matched or split */}
+          <p className="text-sm text-text-pry mt-2 leading-relaxed">
+            Paying for more than one child? Please make a separate transfer for
+            each, with that child&apos;s reference.
+          </p>
         </div>
       )}
 
