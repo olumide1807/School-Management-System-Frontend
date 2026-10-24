@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import SERVER from "../../../Utils/server";
 import Loader from "../../loaders/Loader";
 import ChildPage, { ChildNotFound, firstNameOf, isNotFound } from "./ChildPage";
+import { type ReceiptData, useReceiptPrinter } from "../../../Components/PaymentReceipt";
 
 // Read-only view of GET /portal/child/:childId/fees. Every figure here is
 // the API's — nothing is added up or recomputed on this page. Where the API
@@ -60,7 +61,17 @@ function Tile({ label, value, tone = "default" }: { label: string; value: string
   );
 }
 
-function Payments({ payments, currency }: { payments: any[]; currency: string }) {
+function Payments({
+  payments,
+  currency,
+  onPrint,
+  printDisabled,
+}: {
+  payments: any[];
+  currency: string;
+  onPrint?: (payment: any) => void;
+  printDisabled?: boolean;
+}) {
   if (!payments?.length) return null;
   return (
     <ul className="flex flex-col">
@@ -77,7 +88,19 @@ function Payments({ payments, currency }: { payments: any[]; currency: string })
               {p.reference ? ` · Ref ${p.reference}` : ""}
             </span>
           </span>
-          <span className="text-sm text-text-pry tabular-nums">{money(p.amount, currency)}</span>
+          <span className="inline-flex items-baseline gap-3">
+            <span className="text-sm text-text-pry tabular-nums">{money(p.amount, currency)}</span>
+            {onPrint && (
+              <button
+                type="button"
+                onClick={() => onPrint(p)}
+                disabled={printDisabled}
+                className="px-2.5 py-1 rounded-[8px] text-xs text-tertiary border border-[#DEE0E0] hover:border-tertiary transition-colors disabled:opacity-50"
+              >
+                Print receipt
+              </button>
+            )}
+          </span>
         </li>
       ))}
     </ul>
@@ -321,6 +344,44 @@ function ChildFeesBody({ childId, name, child }: { childId: string; name: string
     retry: false,
   });
 
+  // School name, logo and address for receipts — same endpoint and key as
+  // the report cards and the bursar's receipt
+  const { data: schoolInfo, isPending: schoolPending } = useQuery({
+    queryKey: ["school-info"],
+    queryFn: async () => {
+      const res = await SERVER.get("settings/school-info");
+      return res?.data?.data;
+    },
+    retry: false,
+  });
+  const { printReceipt, receiptPortal, isPrinting } = useReceiptPrinter();
+  const printReady = !schoolPending && !isPrinting;
+
+  // The same receipt the school prints, built from this page's data: the
+  // student from the child profile (already through the guardianship
+  // check), class/term/session from the fee line the payment belongs to.
+  // line === null: the payment's fee no longer exists, and the receipt
+  // says so rather than guessing.
+  const print = (p: any, line: any | null, currency?: string) => {
+    const r: ReceiptData = {
+      paymentId: p._id,
+      reference: p.reference,
+      paymentDate: p.date,
+      amount: Number(p.amount),
+      currency: line?.currency || currency || "NGN",
+      method: p.method,
+      student: {
+        name: [child?.firstName, child?.otherName, child?.surName].filter(Boolean).join(" "),
+        studentID: child?.studentID || "",
+      },
+      fee: line
+        ? { classLabel: line.classLabel || null, termName: line.term?.termName || "Term", sessionName: line.term?.sessionName || "" }
+        : null,
+      school: schoolInfo?.school || null,
+    };
+    printReceipt(r);
+  };
+
   if (isPending) return <Loader />;
   if (isNotFound(error)) return <ChildNotFound />;
   if (isError || !data) {
@@ -342,6 +403,7 @@ function ChildFeesBody({ childId, name, child }: { childId: string; name: string
 
   return (
     <div className="flex flex-col gap-6 max-w-[760px]">
+      {receiptPortal}
       {/* ---- This term ---- */}
       <section className="border border-[#DEE0E0] rounded-[12px] p-5 flex flex-col gap-5">
         <div>
@@ -371,7 +433,8 @@ function ChildFeesBody({ childId, name, child }: { childId: string; name: string
                 <h3 className="text-[13px] font-semibold text-secondary mb-1">
                   Payments recorded this term
                 </h3>
-                <Payments payments={current.payments} currency={current.currency} />
+                <Payments payments={current.payments} currency={current.currency}
+                  onPrint={(p) => print(p, current)} printDisabled={!printReady} />
               </div>
             )}
           </>
@@ -403,6 +466,9 @@ function ChildFeesBody({ childId, name, child }: { childId: string; name: string
           <Payments
             payments={unallocated}
             currency={current?.currency || otherFees[0]?.currency || "NGN"}
+            // No fee on record: the receipt says so instead of a term or class
+            onPrint={(p) => print(p, null, current?.currency || otherFees[0]?.currency || "NGN")}
+            printDisabled={!printReady}
           />
         </section>
       )}
@@ -431,7 +497,8 @@ function ChildFeesBody({ childId, name, child }: { childId: string; name: string
                 <p className="text-sm font-semibold text-text-pry">{termLabel(line.term)}</p>
                 <Figures line={line} />
                 <StatusLine line={line} name={name} />
-                <Payments payments={line.payments} currency={line.currency} />
+                <Payments payments={line.payments} currency={line.currency}
+                  onPrint={(p) => print(p, line)} printDisabled={!printReady} />
               </li>
             ))}
           </ul>
