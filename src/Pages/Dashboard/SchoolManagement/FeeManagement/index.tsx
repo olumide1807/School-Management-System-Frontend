@@ -12,6 +12,7 @@ import { toastOptions } from "../../../../Utils/toastOptions";
 import Loader from "../../../loaders/Loader";
 import { matchStudents, studentLabel } from "./studentSearch";
 import { DuplicateReferenceDialog, ReferenceLookup } from "./PaymentReferenceTools";
+import PaymentReceipt, { type ReceiptData, useReceiptPrinter } from "../../../../Components/PaymentReceipt";
 
 const PLATFORM_FEE = { description: "Platform Fee (Basitech)", amount: "2000" };
 
@@ -21,14 +22,6 @@ const localToday = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-
-// A payment's date, without a time: the bursar picks a day, not a moment
-const paymentDay = (p: any) =>
-  new Date(p.paymentDate || p.createdAt).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
 
 export default function FeeManagement() {
   const [openCreate, setOpenCreate] = useState(false);
@@ -173,6 +166,18 @@ export default function FeeManagement() {
     retry: false,
   });
   const fees = feesData?.data || [];
+
+  // School name, logo and address for receipts — same endpoint and key as
+  // the report cards use
+  const { data: schoolInfo } = useQuery({
+    queryKey: ["school-info"],
+    queryFn: async () => {
+      const res = await SERVER.get("settings/school-info");
+      return res?.data?.data;
+    },
+    retry: false,
+  });
+  const { printReceipt, receiptPortal, isPrinting } = useReceiptPrinter();
 
   const { data: studentsData } = useQuery({
     queryKey: ['all-students'],
@@ -396,39 +401,31 @@ export default function FeeManagement() {
     } finally { setRecordingPayment(false); }
   };
 
-  const printReceipt = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow || !lastPayment) return;
-    const p = lastPayment;
-    printWindow.document.write(`
-      <html><head><title>Payment Receipt</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 30px; max-width: 600px; margin: auto; }
-        .header { text-align: center; border-bottom: 2px solid #0E7094; padding-bottom: 15px; margin-bottom: 20px; }
-        h1 { color: #0E7094; margin: 0; }
-        .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
-        .label { color: #666; }
-        .value { font-weight: 600; }
-        .total { font-size: 20px; color: #0E7094; border-top: 2px solid #0E7094; padding-top: 15px; margin-top: 15px; }
-        .footer { text-align: center; color: #999; margin-top: 30px; font-size: 12px; }
-      </style></head><body>
-      <div class="header">
-        <h1>${activeSession?.sessionName || 'School'}</h1>
-        <p>Payment Receipt</p>
-      </div>
-      <div class="row"><span class="label">Receipt No.</span><span class="value">${p.reference || p._id?.slice(-8).toUpperCase() || 'N/A'}</span></div>
-      <div class="row"><span class="label">Date</span><span class="value">${paymentDay(p)}</span></div>
-      <div class="row"><span class="label">Student</span><span class="value">${p.student?.firstName} ${p.student?.surName}</span></div>
-      <div class="row"><span class="label">Student ID</span><span class="value">${p.student?.studentID}</span></div>
-      <div class="row"><span class="label">Class</span><span class="value">${getArmLabel(p.student?.classArmId)}</span></div>
-      <div class="row"><span class="label">Term</span><span class="value">${getTermLabel(p.fee?.termId)}</span></div>
-      <div class="row"><span class="label">Payment Method</span><span class="value" style="text-transform:capitalize">${p.paymentMethod}</span></div>
-      <div class="row total"><span>Amount Paid</span><span>₦${parseFloat(p.amount).toLocaleString()}</span></div>
-      <div class="footer">Thank you for your payment.<br>Powered by Basitech</div>
-      </body></html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+  // The receipt's data, in the one shape the shared PaymentReceipt renders
+  // for both the bursar and parents. Class, term and session come from the
+  // fee the payment was recorded against, not the student's current class.
+  const toReceipt = (payment: any, student: any, fee: any): ReceiptData => {
+    const term = fee && terms.find((t: any) => t._id === fee.termId);
+    return {
+      paymentId: payment._id,
+      reference: payment.reference,
+      paymentDate: payment.paymentDate || payment.createdAt,
+      amount: Number(payment.amount),
+      currency: fee?.currency || "NGN",
+      method: payment.paymentMethod,
+      student: {
+        name: [student?.firstName, student?.otherName, student?.surName].filter(Boolean).join(" "),
+        studentID: student?.studentID || "",
+      },
+      fee: fee
+        ? {
+            classLabel: getArmLabel(fee.classArmId) || null,
+            termName: getTermLabel(fee.termId) || "Term",
+            sessionName: term && activeSession && term.sessionId === activeSession._id ? activeSession.sessionName : "",
+          }
+        : null,
+      school: schoolInfo?.school || null,
+    };
   };
 
   const resetCreate = () => {
@@ -819,30 +816,23 @@ export default function FeeManagement() {
 
       {/* Receipt Modal */}
       <Modal openModal={openReceipt} closeModal={() => { setOpenReceipt(false); setLastPayment(null); }}
-        title="Payment Receipt" maxWidth="500px">
-        {lastPayment && (
-          <div className="flex flex-col gap-y-4">
-            <div className="text-center border-b-2 border-[#0E7094] pb-3">
-              <h3 className="text-lg font-bold text-[#0E7094]">{activeSession?.sessionName}</h3>
-              <p className="text-xs text-gray-500">Payment Receipt</p>
+        title="Payment Receipt" maxWidth="700px">
+        {lastPayment && (() => {
+          const receipt = toReceipt(lastPayment, lastPayment.student, lastPayment.fee);
+          return (
+            <div className="flex flex-col gap-y-4">
+              {/* Exactly what prints, and exactly what the parent gets */}
+              <PaymentReceipt receipt={receipt} />
+              <Button type="button" color="tertiary" variant="contained" onClick={() => printReceipt(receipt)}
+                disabled={isPrinting}
+                sx={{ color: "white", borderRadius: "10px", paddingY: "10px", textTransform: "capitalize" }}>
+                Print Receipt
+              </Button>
             </div>
-            <div className="flex flex-col gap-2 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Date</span><span className="font-medium">{paymentDay(lastPayment)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Student</span><span className="font-medium">{lastPayment.student?.firstName} {lastPayment.student?.surName}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Student ID</span><span className="font-medium">{lastPayment.student?.studentID}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Class</span><span className="font-medium">{getArmLabel(lastPayment.student?.classArmId)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Term</span><span className="font-medium">{getTermLabel(lastPayment.fee?.termId)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Method</span><span className="font-medium capitalize">{lastPayment.paymentMethod}</span></div>
-              {lastPayment.reference && <div className="flex justify-between"><span className="text-gray-500">Reference</span><span className="font-medium">{lastPayment.reference}</span></div>}
-              <div className="flex justify-between border-t-2 border-[#0E7094] pt-3 mt-2 text-lg"><span className="font-semibold">Amount Paid</span><span className="font-bold text-[#0E7094]">₦{parseFloat(lastPayment.amount).toLocaleString()}</span></div>
-            </div>
-            <Button type="button" color="tertiary" variant="contained" onClick={printReceipt}
-              sx={{ color: "white", borderRadius: "10px", paddingY: "10px", textTransform: "capitalize" }}>
-              Print Receipt
-            </Button>
-          </div>
-        )}
+          );
+        })()}
       </Modal>
+      {receiptPortal}
 
       <MessageModal column desc="Are you sure you want to delete this breakdown?"
         openModal={openDelete} closeModal={() => { setOpenDelete(false); setFeeToDelete(null); }}
