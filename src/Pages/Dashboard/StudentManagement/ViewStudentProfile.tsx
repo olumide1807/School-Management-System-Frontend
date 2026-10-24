@@ -12,6 +12,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import Loader from "../../loaders/Loader";
 import { statesData } from "../../../Data/statesData";
 import { printStudentIdCard } from "./printStudentIdCard";
+import { type ReceiptData, useReceiptPrinter } from "../../../Components/PaymentReceipt";
 
 const COUNTRIES = ['Nigeria', 'Ghana', 'Cameroon', 'Togo', 'Benin', 'South Africa', 'Kenya', 'United Kingdom', 'United States', 'Canada', 'India', 'Other'];
 const RELATIONSHIPS_LIST = ['Father', 'Mother', 'Brother', 'Sister', 'Uncle', 'Aunt', 'Spouse', 'Guardian', 'Other'];
@@ -149,6 +150,65 @@ export default function ViewStudentProfile() {
     return `${level?.levelShortName || ""} ${arm.armName?.toUpperCase() || ""}`.trim();
   };
 
+  // ---- Reprinting a receipt for any earlier payment ----
+  // The same PaymentReceipt the bursar prints on recording and parents
+  // print from the Fees tab. Class, term and session come from the fee the
+  // payment was recorded against, never the student's current class.
+  const { data: schoolInfo, isPending: schoolInfoPending } = useQuery({
+    queryKey: ["school-info"],
+    queryFn: async () => { const res = await SERVER.get("settings/school-info"); return res?.data?.data; },
+    retry: false,
+  });
+  const { printReceipt, receiptPortal, isPrinting } = useReceiptPrinter();
+  const [preparingReceipt, setPreparingReceipt] = useState<string | null>(null);
+
+  // This page only loads the current session's terms. A payment from an
+  // earlier session needs its term looked up, so its receipt names the
+  // right term and session rather than a guess.
+  const findTerm = async (termId: string): Promise<{ termName: string; sessionName: string } | null> => {
+    const current = allTerms.find((t: any) => t._id === termId);
+    if (current) return { termName: current.termName, sessionName: activeSession?.sessionName || "" };
+    const sessionsRes = await SERVER.get("session");
+    const sessions: any[] = sessionsRes?.data?.data || [];
+    for (const s of sessions) {
+      if (s._id === activeSession?._id) continue;
+      const termsRes = await SERVER.get(`session/term/${s._id}`);
+      const t = (termsRes?.data?.data || []).find((x: any) => x._id === termId);
+      if (t) return { termName: t.termName, sessionName: s.sessionName || "" };
+    }
+    return null;
+  };
+
+  const reprintReceipt = async (p: any) => {
+    setPreparingReceipt(p._id);
+    try {
+      const fee = allFees.find((f: any) => f._id === p.feeId);
+      const term = fee ? await findTerm(fee.termId) : null;
+      const receipt: ReceiptData = {
+        paymentId: p._id,
+        reference: p.reference,
+        paymentDate: p.paymentDate || p.createdAt,
+        amount: Number(p.amount),
+        currency: fee?.currency || "NGN",
+        method: p.paymentMethod,
+        student: {
+          name: [student?.firstName, student?.otherName, student?.surName].filter(Boolean).join(" "),
+          studentID: student?.studentID || "",
+        },
+        // No fee on record: the receipt says so instead of a term or class
+        fee: fee
+          ? { classLabel: getArmLabel(fee.classArmId) || null, termName: term?.termName || "Term", sessionName: term?.sessionName || "" }
+          : null,
+        school: schoolInfo?.school || null,
+      };
+      printReceipt(receipt);
+    } catch {
+      toast.error("Couldn't prepare the receipt. Please try again.", toastOptions);
+    } finally {
+      setPreparingReceipt(null);
+    }
+  };
+
   // Photo upload
   const handlePhotoUpload = async (file: File) => {
     setUploadingPhoto(true);
@@ -240,6 +300,7 @@ export default function ViewStudentProfile() {
 
   return (
     <div className="max-w-[900px] mx-auto">
+      {receiptPortal}
       <button onClick={() => navigate("/student-management")} className="text-tertiary flex items-center gap-1 text-sm hover:underline mb-6">
         <KeyboardBackspace fontSize="small" /> Back to Students
       </button>
@@ -488,6 +549,7 @@ export default function ViewStudentProfile() {
                     <th className="p-3 font-semibold">Method</th>
                     <th className="p-3 font-semibold">Reference</th>
                     <th className="p-3 font-semibold text-right">Amount</th>
+                    <th className="p-3 font-semibold text-right">Receipt</th>
                   </tr></thead>
                   <tbody>
                     {[...allPayments].sort((a: any, b: any) => new Date(b.paymentDate || b.createdAt).getTime() - new Date(a.paymentDate || a.createdAt).getTime())
@@ -501,6 +563,14 @@ export default function ViewStudentProfile() {
                             <td className="p-3 capitalize">{p.paymentMethod || "—"}</td>
                             <td className="p-3">{p.reference || "—"}</td>
                             <td className="p-3 text-right font-medium">₦{parseFloat(p.amount).toLocaleString()}</td>
+                            <td className="p-3 text-right">
+                              <Button size="small" variant="outlined" color="tertiary"
+                                onClick={() => reprintReceipt(p)}
+                                disabled={schoolInfoPending || isPrinting || preparingReceipt === p._id}
+                                sx={{ borderRadius: "8px", textTransform: "none", whiteSpace: "nowrap" }}>
+                                {preparingReceipt === p._id ? "Preparing…" : "Reprint"}
+                              </Button>
+                            </td>
                           </tr>
                         );
                       })}
