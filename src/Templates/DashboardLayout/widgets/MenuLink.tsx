@@ -4,6 +4,7 @@ import StaffMgtMenuIcon from "../../../Components/Vectors/StaffMgtMenuIcon";
 import StudMgtMenuIcon from "../../../Components/Vectors/StudMgtMenuIcon";
 import SettingsIcon from "../../../Components/Vectors/SettingsIcon";
 import SupportIcon from "../../../Components/Vectors/SupportIcon";
+import CalendarMenuIcon from "../../../Components/Vectors/CalendarMenuIcon";
 
 type Sublink = { name: string; link: string };
 
@@ -74,6 +75,7 @@ const StudentMenuLinks: MenuItem[] = [
   { icon: <DashboardMenuIcon />, name: "Dashboard", link: "/" },
   { icon: <SchMgtMenuIcon />, name: "My results", link: "my-results" },
   { icon: <StudMgtMenuIcon />, name: "My attendance", link: "my-attendance" },
+  { icon: <CalendarMenuIcon />, name: "Calendar", link: "school-calendar" },
   {
     icon: <StaffMgtMenuIcon />,
     name: "My profile",
@@ -84,6 +86,8 @@ const StudentMenuLinks: MenuItem[] = [
 
 const ParentMenuLinks: MenuItem[] = [
   { icon: <DashboardMenuIcon />, name: "My children", link: "/" },
+  // School-wide, so here rather than on each child's page
+  { icon: <CalendarMenuIcon />, name: "Calendar", link: "school-calendar" },
   { icon: <StaffMgtMenuIcon />, name: "My details", link: "my-parent-profile" },
   { icon: <SupportIcon />, name: "Support", link: "support" },
 ];

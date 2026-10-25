@@ -28,6 +28,7 @@ import ChildResults from "./Pages/Dashboard/Parent/ChildResults";
 import ChildAttendance from "./Pages/Dashboard/Parent/ChildAttendance";
 import ChildFees from "./Pages/Dashboard/Parent/ChildFees";
 import ParentProfile from "./Pages/Dashboard/Parent/Profile";
+import SchoolCalendar from "./Pages/Dashboard/Portal/SchoolCalendar";
 import DashboardNotFound from "./Pages/Dashboard/NotFound";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -230,6 +231,8 @@ function AllRoutes() {
         <Route path="child/:childId/attendance" element={<ChildAttendance />} />
         <Route path="child/:childId/fees" element={<ChildFees />} />
         <Route path="my-parent-profile" element={<ParentProfile />} />
+        {/* Students and parents: the same school-wide calendar */}
+        <Route path="school-calendar" element={<SchoolCalendar />} />
         <Route path="support" element={<Support />} />
         {/* Admins get in too, but see only the Bank Details tab */}
         <Route path="settings" element={permissions.canAccessSettings || permissions.canEditBankDetails ? <Settings /> : <Navigate to="/" />} />
