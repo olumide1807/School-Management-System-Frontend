@@ -9,7 +9,10 @@ export default function StudentAttendance() {
   const [termId, setTermId] = useState("");
 
   const { data, isPending, isError } = useQuery({
-    queryKey: ["student-attendance", termId],
+    // The student's own portal attendance view (GET portal/student/attendance).
+    // Not "student-attendance": the admin profile caches a different
+    // endpoint and shape for one student's raw register records.
+    queryKey: ["student-portal-attendance", termId],
     queryFn: async () => {
       const res = await SERVER.get(
         `portal/student/attendance${termId ? `?termId=${termId}` : ""}`,

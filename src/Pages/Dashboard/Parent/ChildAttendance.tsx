@@ -9,7 +9,7 @@ import ChildPage, { ChildNotFound, firstNameOf, isNotFound } from "./ChildPage";
 function ChildAttendanceBody({ childId, name }: { childId: string; name: string }) {
   const [termId, setTermId] = useState("");
 
-  // Same shape as ["student-attendance", ...] but a different child's
+  // Same shape as ["student-portal-attendance", ...] but a different child's
   // data, so the key carries childId and a prefix of its own
   const { data, isPending, isError, error } = useQuery({
     queryKey: ["child-attendance", childId, termId],

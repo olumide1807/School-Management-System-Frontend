@@ -112,7 +112,9 @@ export default function ViewStudentProfile() {
 
   // Fetch attendance
   const { data: attendanceData } = useQuery({
-    queryKey: ["student-attendance", studentId],
+    // One student's raw register records (GET attendance/student/:id) —
+    // a different endpoint and shape from the student portal's view
+    queryKey: ["student-attendance-records", studentId],
     queryFn: async () => { const res = await SERVER.get(`attendance/student/${studentId}`); return res?.data; },
     enabled: !!studentId, retry: false,
   });
