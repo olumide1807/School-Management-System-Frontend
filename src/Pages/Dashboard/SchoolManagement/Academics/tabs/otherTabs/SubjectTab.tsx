@@ -15,7 +15,7 @@ const SubjectTab = () => {
     const armId = searchParams.get('arm');
 
     const allSubjects = useGetAllSubjects();
-    const subjects = allSubjects?.data?.data?.data || [];
+    const subjects = allSubjects?.data?.data || [];
 
     // Fetch specific subjects for this class arm
     const { data: armSubjectsData, isPending } = useQuery({

@@ -108,13 +108,15 @@ export const useClassArms = () => {
 }
 
 
+// Caches the response body, like every other ['all-subjects'] query —
+// Grading, the teacher dashboard, the staff profile and the Timetable tab
+// share this key, so it must hold one shape. The list is data.data.
 export const useGetAllSubjects = () => {
   const query = useQuery({
       queryKey: ['all-subjects'],
       queryFn: async () => {
-          const data = await SERVER.get('subject')
-  
-          return data;
+          const res = await SERVER.get('subject')
+          return res?.data;
       }
       })
       return query;

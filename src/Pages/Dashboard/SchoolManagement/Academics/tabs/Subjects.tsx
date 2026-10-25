@@ -35,7 +35,7 @@ const Subjects = () => {
 	const allArms = useClassArms();
 	const allLevels = useClassLevels();
 
-	const subjects = allSubjects?.data?.data?.data || [];
+	const subjects = allSubjects?.data?.data || [];
 	const classArms = allArms?.data?.data?.data || [];
 	const classLevels = allLevels?.data?.data?.data || [];
 	const isLoading = allSubjects?.isPending;
