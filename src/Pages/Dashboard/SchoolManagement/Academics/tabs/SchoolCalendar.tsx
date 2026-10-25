@@ -45,8 +45,14 @@ const dayCount = (start: string, end: string) =>
 
 const toInputDate = (iso: string) => new Date(iso).toISOString().split("T")[0];
 
-type Form = { name: string; type: string; startDate: string; endDate: string };
-const emptyForm: Form = { name: "", type: "public_holiday", startDate: "", endDate: "" };
+// For a new entry with no explicit choice — mirrors the backend default:
+// holidays, breaks and other closures close the school; events don't
+const defaultClosesSchool = (type: string) => type !== "school_event";
+
+// closesSchoolTouched: on a new entry the choice follows the type until the
+// admin picks one. An existing entry keeps its stored value whatever the type.
+type Form = { name: string; type: string; startDate: string; endDate: string; closesSchool: boolean; closesSchoolTouched: boolean };
+const emptyForm: Form = { name: "", type: "public_holiday", startDate: "", endDate: "", closesSchool: true, closesSchoolTouched: false };
 
 export default function SchoolCalendar() {
   const queryClient = useQueryClient();
@@ -57,6 +63,9 @@ export default function SchoolCalendar() {
   const [openModal, setOpenModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Form>(emptyForm);
+  // The stored value and start of the entry being edited, to warn when a
+  // change would affect days that have already happened
+  const [original, setOriginal] = useState<{ closesSchool: boolean; startDate: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [showPast, setShowPast] = useState(false);
@@ -80,24 +89,31 @@ export default function SchoolCalendar() {
 
   const openAdd = () => {
     setEditingId(null);
+    setOriginal(null);
     setForm(emptyForm);
     setOpenModal(true);
   };
 
   const openEdit = (entry: any) => {
     setEditingId(entry._id);
+    // Missing means closed, as it does everywhere else
+    const closes = entry.closesSchool !== false;
     setForm({
       name: entry.name,
       type: entry.type,
       startDate: toInputDate(entry.startDate),
       endDate: toInputDate(entry.endDate),
+      closesSchool: closes,
+      closesSchoolTouched: true,
     });
+    setOriginal({ closesSchool: closes, startDate: toInputDate(entry.startDate) });
     setOpenModal(true);
   };
 
   const close = () => {
     setOpenModal(false);
     setEditingId(null);
+    setOriginal(null);
     setForm(emptyForm);
   };
 
@@ -110,7 +126,8 @@ export default function SchoolCalendar() {
 
     setSaving(true);
     try {
-      const payload = { ...form, endDate };
+      // closesSchool is always sent, so what's stored is what the form showed
+      const payload = { name: form.name, type: form.type, startDate: form.startDate, endDate, closesSchool: form.closesSchool };
       if (editingId) await SERVER.put(`calendar/${editingId}`, payload);
       else await SERVER.post("calendar", payload);
       toast.success(editingId ? "Updated" : "Added to the calendar", toastOptions);
@@ -124,7 +141,10 @@ export default function SchoolCalendar() {
   };
 
   const remove = async (entry: any) => {
-    if (!window.confirm(`Remove "${entry.name}" from the calendar? It will count as a school day again.`))
+    const consequence = entry.closesSchool !== false
+      ? "Those days will count as school days again."
+      : "It doesn't change attendance — school was open on those days anyway.";
+    if (!window.confirm(`Remove "${entry.name}" from the calendar? ${consequence}`))
       return;
     try {
       await SERVER.delete(`calendar/${entry._id}`);
@@ -167,6 +187,13 @@ export default function SchoolCalendar() {
         <span className={`text-xs px-2.5 py-1 rounded-md ${TYPE_STYLES[entry.type] || TYPE_STYLES.other}`}>
           {TYPE_LABELS[entry.type] || "Other"}
         </span>
+        <span
+          className={`text-xs px-2.5 py-1 rounded-md border ${
+            entry.closesSchool === false ? "border-[#B7E4F3] text-[#0E7094]" : "border-gray-200 text-gray-600"
+          }`}
+        >
+          {entry.closesSchool === false ? "School open" : "School closed"}
+        </span>
         <div className="flex gap-1">
           <button
             onClick={() => openEdit(entry)}
@@ -196,8 +223,9 @@ export default function SchoolCalendar() {
           <div className="max-w-[620px]">
             <h2 className="text-lg font-semibold text-black">School Calendar</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Days the school is closed during term. Attendance can't be marked on
-              these days, and they won't count against any student's attendance.
+              Holidays, breaks and school events. Each entry says whether the school
+              is closed: on closed days attendance can't be marked and the days don't
+              count against any student; on open days the register is taken as normal.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -217,7 +245,7 @@ export default function SchoolCalendar() {
               onClick={openAdd}
               sx={{ borderRadius: "8px", textTransform: "none", color: "white" }}
             >
-              Add closure
+              Add to calendar
             </Button>
           </div>
         </div>
@@ -252,7 +280,7 @@ export default function SchoolCalendar() {
               onClick={() => setShowPast((v) => !v)}
               className="text-sm text-tertiary mb-2"
             >
-              {showPast ? "Hide" : "Show"} past closures ({past.length})
+              {showPast ? "Hide" : "Show"} past entries ({past.length})
             </button>
             {showPast && (
               <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -268,7 +296,7 @@ export default function SchoolCalendar() {
       <Modal
         openModal={openModal}
         closeModal={close}
-        title={editingId ? "Edit closure" : "Add closure"}
+        title={editingId ? "Edit calendar entry" : "Add to the calendar"}
         maxWidth="520px"
       >
         <div className="flex flex-col gap-4">
@@ -287,7 +315,14 @@ export default function SchoolCalendar() {
             <span className="text-sm text-gray-700">Type</span>
             <select
               value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value })}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  type: e.target.value,
+                  // Follow the type's default until the admin chooses
+                  closesSchool: form.closesSchoolTouched ? form.closesSchool : defaultClosesSchool(e.target.value),
+                })
+              }
               className="border border-gray-300 rounded-lg p-2.5 text-sm bg-white"
             >
               {Object.entries(TYPE_LABELS).map(([value, label]) => (
@@ -326,6 +361,65 @@ export default function SchoolCalendar() {
             </label>
           </div>
           <p className="text-xs text-gray-500 -mt-2">For a single day, leave "To" the same as "From".</p>
+
+          {/* Whether school is closed decides attendance for these days —
+              spell out what each choice does */}
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-sm text-gray-700 mb-1">Is the school closed on these days?</legend>
+            {[
+              {
+                value: true,
+                title: "Yes — school is closed",
+                body: "No lessons. The register isn't taken, no student is marked absent, and these days don't count in anyone's attendance.",
+              },
+              {
+                value: false,
+                title: "No — school is open; something is happening at school",
+                body: "A normal school day for attendance, e.g. a sports day or a PTA meeting. Teachers take the register as usual, and if a class's register isn't taken by closing time, every student in it is marked absent automatically.",
+              },
+            ].map((opt) => (
+              <label
+                key={String(opt.value)}
+                className={`flex gap-3 rounded-lg border p-3 cursor-pointer ${
+                  form.closesSchool === opt.value ? "border-tertiary bg-[#F5FBFD]" : "border-gray-200"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="closesSchool"
+                  checked={form.closesSchool === opt.value}
+                  onChange={() => setForm({ ...form, closesSchool: opt.value, closesSchoolTouched: true })}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-black">{opt.title}</span>
+                  <span className="block text-xs text-gray-600 mt-0.5 leading-relaxed">{opt.body}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+
+          {/* Changing this for days that have already started affects
+              attendance that's already been taken, or should have been */}
+          {original &&
+            original.closesSchool !== form.closesSchool &&
+            [original.startDate, form.startDate].some((d) => d && d <= new Date().toISOString().slice(0, 10)) && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 leading-relaxed">
+              {form.closesSchool ? (
+                <>
+                  These dates include today or days that have passed. Closing them takes those
+                  days out of every student&apos;s attendance, including any registers already taken.
+                </>
+              ) : (
+                <>
+                  These dates include today or days that have passed. Opening them adds those
+                  days back into every student&apos;s attendance: past days with no register will
+                  show as &ldquo;register not taken&rdquo;, and if today&apos;s register isn&apos;t
+                  taken by closing time, every student will be marked absent.
+                </>
+              )}
+            </div>
+          )}
 
           <Button
             color="tertiary"
