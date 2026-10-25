@@ -76,15 +76,34 @@ response shapes — one returned an array, the other an object, and whichever
 mounted second read the cached value of the first.
 
 Rules:
+- **A `queryFn` returns the response body — `res?.data` — never the whole
+  axios response.** Not `return res`, not `return await SERVER.get(...)`.
+  The body is the backend's `{ success, message, data }`; the axios response
+  wraps it in another layer (`status`, `headers`, `config`, and the body
+  under `data`). If one query under a key caches the body and another
+  caches the whole response, they cache different shapes under one key, and
+  whichever loads last decides what everyone reads — the rest get a list
+  one level off: empty, or a crash. This is not hypothetical: the crash that
+  started this project and both collisions the October key sweep found
+  (`["all-subjects"]`, `["timetable-grid", armId]`) were exactly this.
+- Don't reshape inside `queryFn` either (`return { armId, grid }`). Cache
+  the body as it came, and derive anything else in the component. The
+  key's parameters are already in the key — they aren't data.
 - A key identifies a *shape*, not a topic. Same key ⇒ same endpoint ⇒ same
   shape, everywhere.
 - Include every parameter in the key: `["class-students", activeArmId]`.
 - Guard anyway. `Array.isArray(x) ? x : []` costs nothing and turns a white
   screen into an empty table.
 
-Responses are usually `res.data.data` (the backend's `successResponse` wraps
-once, axios wraps again), so `const rows = data?.data || []` is the common
-shape. Some older hooks go one deeper: `levelsData?.data?.data?.data`.
+With the body cached, the list is one level down: `const rows = data?.data || []`.
+
+Some older hooks in `src/services/api-call.ts` still cache the whole axios
+response, under keys nothing else uses: `["classes"]`, `["class-arms"]`,
+`["session"]`, `["all-session"]`, `["account-details"]`, `["annoucement"]`.
+That's why their callers read `levelsData?.data?.data?.data`. They work only
+because no other query shares those keys. Never add a second query under
+one of them; convert the hook to `res?.data` (and its callers to one level
+less) first, as was done for `useGetAllSubjects`.
 
 Shared hooks: `src/hooks/useMyClasses.ts` (arms where the user is form
 teacher), `src/hooks/useMySubjects.ts` (subjects they teach). A teacher may
