@@ -294,12 +294,15 @@ export default function TeacherDashboard() {
   // ---------- Grids for every arm the teacher is involved with ----------
   const armIds = contexts.map((c) => c.armId);
 
+  // Caches the response body, as the Academics Timetable tab does under the
+  // same key — a teacher can open both. The arm isn't data: useQueries
+  // returns results in the order of armIds, so gridQueries[i] is armIds[i].
   const gridQueries = useQueries({
     queries: armIds.map((armId) => ({
       queryKey: ["timetable-grid", armId],
       queryFn: async () => {
         const res = await SERVER.get(`timetable-grid/grid/${armId}`);
-        return { armId, grid: res?.data?.data?.grid || {} };
+        return res?.data;
       },
       retry: false,
     })),
@@ -321,11 +324,12 @@ export default function TeacherDashboard() {
       arm: string;
     }[] = [];
 
-    gridQueries.forEach((q) => {
-      const result: any = q.data;
-      if (!result?.grid) return;
-      const mine = mySubjectIdsInArm(result.armId);
-      const dayCells = result.grid[day] || {};
+    gridQueries.forEach((q, i) => {
+      const armId = armIds[i];
+      const grid = (q.data as any)?.data?.grid;
+      if (!grid) return;
+      const mine = mySubjectIdsInArm(armId);
+      const dayCells = grid[day] || {};
 
       Object.entries(dayCells).forEach(([periodKey, cell]: [string, any]) => {
         if (!cell?.subjectId || !mine.includes(cell.subjectId)) return;
@@ -335,7 +339,7 @@ export default function TeacherDashboard() {
           end: slot?.end ?? 0,
           label: slot?.label || `Period ${periodKey}`,
           subject: cell.subjectName || subjectName(cell.subjectId),
-          arm: armLabel(result.armId),
+          arm: armLabel(armId),
         });
       });
     });
@@ -343,6 +347,7 @@ export default function TeacherDashboard() {
     return out.sort((a, b) => a.start - b.start);
   }, [
     gridQueries.map((q) => q.dataUpdatedAt).join(","),
+    armIds.join(","),
     periodSlots,
     mySubjects,
     allArms,
