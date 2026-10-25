@@ -1,21 +1,25 @@
 // The school calendar for families — one component for the student and
 // parent portals, rendering GET /portal/calendar as it comes.
 //
-// Every entry on the school calendar is a day with no school: the
-// attendance register and the auto-marker treat every entry as a closure,
-// whatever its type, so this page says so rather than implying some are
-// ordinary school days.
+// Each entry either closes the school (a holiday, a break) or is something
+// happening at school on an ordinary school day (a sports day). That's the
+// entry's closesSchool flag, never its type — the same flag the register
+// and the auto-marker go by — and each row says which it is.
 //
 // Leads with what people open it for — when the term ends and the next
-// day off — then the term's closures in date order. Past ones are listed
+// day off — then the term's entries in date order. Past ones are listed
 // last and dimmed.
 
 const TYPE_LABELS: Record<string, string> = {
   public_holiday: "Public holiday",
   school_break: "School break",
   school_event: "School event",
-  other: "Closure",
 };
+
+// Missing means closed, as it does on the server
+const closesSchool = (e: any) => e?.closesSchool !== false;
+
+const typeLabel = (e: any) => TYPE_LABELS[e.type] || (closesSchool(e) ? "Closure" : "Event");
 
 // Dates are stored as UTC day-starts: compare and show them as calendar
 // days, in UTC, so a day never shifts in a western timezone
@@ -42,14 +46,24 @@ const range = (e: any) =>
     : `${fmt(e.startDate)} – ${fmt(e.endDate)}`;
 
 function EntryRow({ e, past }: { e: any; past?: boolean }) {
+  const closed = closesSchool(e);
   return (
     <li className={`flex flex-wrap items-baseline justify-between gap-2 py-3 border-b border-[#EFF5F8] last:border-b-0 ${past ? "opacity-60" : ""}`}>
       <span className="min-w-0">
         <span className="block text-sm text-text-pry">{e.name}</span>
-        <span className="block text-xs text-text-ter mt-0.5">{range(e)}</span>
+        <span className="block text-xs text-text-ter mt-0.5">
+          {range(e)} · {closed ? "No school" : "School is open as usual"}
+        </span>
       </span>
-      <span className="text-xs px-2 py-0.5 rounded-[6px] bg-bg-7 text-text-sec">
-        {TYPE_LABELS[e.type] || "Closure"}
+      <span className="flex gap-1.5">
+        <span className="text-xs px-2 py-0.5 rounded-[6px] bg-bg-7 text-text-sec">{typeLabel(e)}</span>
+        <span
+          className={`text-xs px-2 py-0.5 rounded-[6px] ${
+            closed ? "bg-[#FDF1E7] text-[#8A4B0F]" : "bg-[#E7F4F9] text-[#0E7094]"
+          }`}
+        >
+          {closed ? "Day off" : "At school"}
+        </span>
       </span>
     </li>
   );
@@ -76,10 +90,15 @@ export default function SchoolCalendarView({ data }: { data: any }) {
     );
   }
 
-  // What's next
-  const ongoing = entries.find((e) => dayOf(e.startDate) <= today && today <= dayOf(e.endDate));
-  const upcoming = entries.filter((e) => dayOf(e.startDate) > today);
-  const nextClosure = upcoming[0] || null;
+  // What's next. Only entries that close the school are days off; the rest
+  // are things happening at school and never count as one.
+  const covering = (e: any) => dayOf(e.startDate) <= today && today <= dayOf(e.endDate);
+  const closures = entries.filter(closesSchool);
+  const events = entries.filter((e) => !closesSchool(e));
+  const ongoing = closures.find(covering);
+  const nextClosure = closures.find((e) => dayOf(e.startDate) > today) || null;
+  // The next thing on at school (today's, else the next one)
+  const nextEvent = events.find(covering) || events.find((e) => dayOf(e.startDate) > today) || null;
   const nextTerm = terms.find((t) => t.startDate && dayOf(t.startDate) > today && !t.isCurrent) || null;
   const termEndDay = term?.endDate ? dayOf(term.endDate) : null;
 
@@ -136,8 +155,22 @@ export default function SchoolCalendarView({ data }: { data: any }) {
             </p>
           </div>
         ) : entries.length > 0 ? (
-          <p className="text-sm text-text-pry">No more holidays or closures this session.</p>
+          <p className="text-sm text-text-pry">No more days off this session.</p>
         ) : null}
+
+        {data?.calendarSetUp !== false && nextEvent && (
+          <div>
+            <p className="text-[13px] text-gray-1">On at school · school is open</p>
+            <p className="text-sm font-medium text-text-pry">{nextEvent.name}</p>
+            <p className="text-sm text-text-ter">
+              {covering(nextEvent)
+                ? dayOf(nextEvent.startDate) === dayOf(nextEvent.endDate)
+                  ? "Today"
+                  : `Until ${fmt(nextEvent.endDate)}`
+                : `${range(nextEvent)} · ${inDays(daysBetween(today, dayOf(nextEvent.startDate)))}`}
+            </p>
+          </div>
+        )}
 
         {nextTerm && (
           <div>
@@ -151,23 +184,19 @@ export default function SchoolCalendarView({ data }: { data: any }) {
       {data?.calendarSetUp === false ? (
         <section className="border border-[#DEE0E0] rounded-[12px] p-5">
           <p className="text-sm text-text-pry leading-relaxed">
-            The school hasn&apos;t set up its calendar yet, so no holidays or closures are
+            The school hasn&apos;t set up its calendar yet, so no holidays or events are
             listed. They&apos;ll appear here once it has.
           </p>
         </section>
       ) : entries.length === 0 ? (
         <section className="border border-[#DEE0E0] rounded-[12px] p-5">
           <p className="text-sm text-text-pry leading-relaxed">
-            No holidays or closures are recorded for {session?.sessionName || "this session"}.
+            No holidays or events are recorded for {session?.sessionName || "this session"}.
             The school office can confirm if you&apos;re expecting one.
           </p>
         </section>
       ) : (
         <>
-          <p className="text-[13px] text-gray-1 -mb-3">
-            There&apos;s no school on any of the days below.
-          </p>
-
           {thisTerm.length > 0 && (
             <section className="border border-[#DEE0E0] rounded-[12px] p-5">
               <h2 className="text-base font-semibold text-secondary mb-1">
