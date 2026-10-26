@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "@mui/material/Button";
 import { Add, Edit, DeleteOutline, Flag } from "@mui/icons-material";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -67,6 +67,9 @@ export default function SchoolCalendar() {
   // change would affect days that have already happened
   const [original, setOriginal] = useState<{ closesSchool: boolean; startDate: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  // The server's refusal, shown in the form until the admin changes something
+  const [saveError, setSaveError] = useState<string | null>(null);
+  useEffect(() => setSaveError(null), [form, openModal]);
   const [seeding, setSeeding] = useState(false);
   const [showPast, setShowPast] = useState(false);
 
@@ -117,17 +120,17 @@ export default function SchoolCalendar() {
     setForm(emptyForm);
   };
 
-  // A closed entry whose dates (stored or new) include today or earlier can't
-  // be reopened — the server refuses it too. "Today" is the UTC day, the
-  // same day the server and the auto-marker use.
+  // "Today" is the UTC day, the same day the server and the auto-marker use
   const todayDay = new Date().toISOString().slice(0, 10);
-  const startedClosed =
-    !!original && original.closesSchool && [original.startDate, form.startDate].some((d) => d && d <= todayDay);
+  // Whether a stored closure has started — only to explain things up front.
+  // The rule itself (a closed day that has started can't be reopened) is
+  // the server's alone: it knows about other entries covering the same
+  // days, and its refusal is shown in the form as it comes.
+  const closureStarted = (entry: { closesSchool?: boolean; startDate: string }) =>
+    entry.closesSchool !== false && toInputDate(entry.startDate) <= todayDay;
 
   const save = async () => {
     if (!form.name.trim()) return toast.error("Give it a name", toastOptions);
-    if (startedClosed && !form.closesSchool)
-      return toast.error("A closed day that has already started can't be reopened", toastOptions);
     if (!form.startDate) return toast.error("Choose a date", toastOptions);
     const endDate = form.endDate || form.startDate;
     if (endDate < form.startDate)
@@ -143,16 +146,22 @@ export default function SchoolCalendar() {
       await refresh();
       close();
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || "Could not save", toastOptions);
+      // A refusal explains itself at length — show it in the form, not a toast
+      if (error?.response?.status === 400 && error?.response?.data?.error)
+        setSaveError(error.response.data.error);
+      else toast.error(error?.response?.data?.error || "Could not save", toastOptions);
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async (entry: any) => {
-    const consequence = entry.closesSchool !== false
-      ? "Those days will count as school days again."
-      : "It doesn't change attendance — school was open on those days anyway.";
+    const consequence =
+      entry.closesSchool === false
+        ? "It doesn't change attendance — school was open on those days anyway."
+        : closureStarted(entry)
+        ? "This closure has already started. Days up to today have to stay closed, so it can only be removed if another entry on the calendar also closes them."
+        : "Those days will count as school days again.";
     if (!window.confirm(`Remove "${entry.name}" from the calendar? ${consequence}`))
       return;
     try {
@@ -160,7 +169,10 @@ export default function SchoolCalendar() {
       toast.success("Removed", toastOptions);
       await refresh();
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || "Could not remove", toastOptions);
+      // The refusal is long and matters — an alert stays until it's read
+      if (error?.response?.status === 400 && error?.response?.data?.error)
+        window.alert(error.response.data.error);
+      else toast.error(error?.response?.data?.error || "Could not remove", toastOptions);
     }
   };
 
@@ -386,12 +398,10 @@ export default function SchoolCalendar() {
                 title: "No — school is open; something is happening at school",
                 body: "A normal school day for attendance, e.g. a sports day or a PTA meeting. Teachers take the register as usual, and if a class's register isn't taken by closing time, every student in it is marked absent automatically.",
               },
-            ].map((opt) => {
-              const disabled = opt.value === false && startedClosed && form.closesSchool;
-              return (
+            ].map((opt) => (
               <label
                 key={String(opt.value)}
-                className={`flex gap-3 rounded-lg border p-3 ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} ${
+                className={`flex gap-3 rounded-lg border p-3 cursor-pointer ${
                   form.closesSchool === opt.value ? "border-tertiary bg-[#F5FBFD]" : "border-gray-200"
                 }`}
               >
@@ -399,7 +409,6 @@ export default function SchoolCalendar() {
                   type="radio"
                   name="closesSchool"
                   checked={form.closesSchool === opt.value}
-                  disabled={disabled}
                   onChange={() => setForm({ ...form, closesSchool: opt.value, closesSchoolTouched: true })}
                   className="mt-1"
                 />
@@ -408,26 +417,24 @@ export default function SchoolCalendar() {
                   <span className="block text-xs text-gray-600 mt-0.5 leading-relaxed">{opt.body}</span>
                 </span>
               </label>
-              );
-            })}
+            ))}
           </fieldset>
 
-          {/* A closed day that has started can't be reopened: no register was
-              taken and one can't be taken now. Say so before they try. */}
-          {startedClosed && (
-            <div
-              className={`rounded-lg border px-3 py-2.5 text-xs leading-relaxed ${
-                form.closesSchool ? "border-gray-200 bg-gray-50 text-gray-700" : "border-red-300 bg-red-50 text-red-800"
-              }`}
-            >
-              {!form.closesSchool && (
-                <span className="block font-medium mb-1">This can&apos;t be saved as school open.</span>
-              )}
-              These dates include today or days that have already passed, while the school was
-              closed. No register was taken then, and it can&apos;t be taken now — reopening would
-              record absences for a register nobody was asked to take. If a past day really needs
-              reopening, that&apos;s a correction to attendance records rather than a calendar
-              change: contact support so the attendance can be put right at the same time.
+          {/* Say up front what a started closure allows; the server decides */}
+          {original && original.closesSchool && original.startDate <= todayDay && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs text-gray-700 leading-relaxed">
+              This closure has already started. Its days up to today have to stay closed: no
+              register was taken on them and it can&apos;t be taken now, so they can&apos;t be
+              changed to school open or have the dates moved off them. Days that haven&apos;t
+              started yet can still be changed. If a past day really needs reopening, that&apos;s a
+              correction to attendance records — contact support.
+            </div>
+          )}
+
+          {saveError && (
+            <div role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-xs text-red-800 leading-relaxed">
+              <span className="block font-medium mb-1">Not saved</span>
+              {saveError}
             </div>
           )}
 
@@ -445,7 +452,7 @@ export default function SchoolCalendar() {
             color="tertiary"
             variant="contained"
             onClick={save}
-            disabled={saving || (startedClosed && !form.closesSchool)}
+            disabled={saving}
             sx={{
               color: "white",
               borderRadius: "10px",
