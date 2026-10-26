@@ -117,8 +117,17 @@ export default function SchoolCalendar() {
     setForm(emptyForm);
   };
 
+  // A closed entry whose dates (stored or new) include today or earlier can't
+  // be reopened — the server refuses it too. "Today" is the UTC day, the
+  // same day the server and the auto-marker use.
+  const todayDay = new Date().toISOString().slice(0, 10);
+  const startedClosed =
+    !!original && original.closesSchool && [original.startDate, form.startDate].some((d) => d && d <= todayDay);
+
   const save = async () => {
     if (!form.name.trim()) return toast.error("Give it a name", toastOptions);
+    if (startedClosed && !form.closesSchool)
+      return toast.error("A closed day that has already started can't be reopened", toastOptions);
     if (!form.startDate) return toast.error("Choose a date", toastOptions);
     const endDate = form.endDate || form.startDate;
     if (endDate < form.startDate)
@@ -377,10 +386,12 @@ export default function SchoolCalendar() {
                 title: "No — school is open; something is happening at school",
                 body: "A normal school day for attendance, e.g. a sports day or a PTA meeting. Teachers take the register as usual, and if a class's register isn't taken by closing time, every student in it is marked absent automatically.",
               },
-            ].map((opt) => (
+            ].map((opt) => {
+              const disabled = opt.value === false && startedClosed && form.closesSchool;
+              return (
               <label
                 key={String(opt.value)}
-                className={`flex gap-3 rounded-lg border p-3 cursor-pointer ${
+                className={`flex gap-3 rounded-lg border p-3 ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} ${
                   form.closesSchool === opt.value ? "border-tertiary bg-[#F5FBFD]" : "border-gray-200"
                 }`}
               >
@@ -388,6 +399,7 @@ export default function SchoolCalendar() {
                   type="radio"
                   name="closesSchool"
                   checked={form.closesSchool === opt.value}
+                  disabled={disabled}
                   onChange={() => setForm({ ...form, closesSchool: opt.value, closesSchoolTouched: true })}
                   className="mt-1"
                 />
@@ -396,28 +408,36 @@ export default function SchoolCalendar() {
                   <span className="block text-xs text-gray-600 mt-0.5 leading-relaxed">{opt.body}</span>
                 </span>
               </label>
-            ))}
+              );
+            })}
           </fieldset>
 
-          {/* Changing this for days that have already started affects
-              attendance that's already been taken, or should have been */}
-          {original &&
-            original.closesSchool !== form.closesSchool &&
-            [original.startDate, form.startDate].some((d) => d && d <= new Date().toISOString().slice(0, 10)) && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 leading-relaxed">
-              {form.closesSchool ? (
-                <>
-                  These dates include today or days that have passed. Closing them takes those
-                  days out of every student&apos;s attendance, including any registers already taken.
-                </>
-              ) : (
-                <>
-                  These dates include today or days that have passed. Opening them adds those
-                  days back into every student&apos;s attendance: past days with no register will
-                  show as &ldquo;register not taken&rdquo;, and if today&apos;s register isn&apos;t
-                  taken by closing time, every student will be marked absent.
-                </>
+          {/* A closed day that has started can't be reopened: no register was
+              taken and one can't be taken now. Say so before they try. */}
+          {startedClosed && (
+            <div
+              className={`rounded-lg border px-3 py-2.5 text-xs leading-relaxed ${
+                form.closesSchool ? "border-gray-200 bg-gray-50 text-gray-700" : "border-red-300 bg-red-50 text-red-800"
+              }`}
+            >
+              {!form.closesSchool && (
+                <span className="block font-medium mb-1">This can&apos;t be saved as school open.</span>
               )}
+              These dates include today or days that have already passed, while the school was
+              closed. No register was taken then, and it can&apos;t be taken now — reopening would
+              record absences for a register nobody was asked to take. If a past day really needs
+              reopening, that&apos;s a correction to attendance records rather than a calendar
+              change: contact support so the attendance can be put right at the same time.
+            </div>
+          )}
+
+          {/* Closing days that have started is allowed, but takes them out of
+              attendance already recorded */}
+          {original && !original.closesSchool && form.closesSchool &&
+            [original.startDate, form.startDate].some((d) => d && d <= todayDay) && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 leading-relaxed">
+              These dates include today or days that have passed. Closing them takes those
+              days out of every student&apos;s attendance, including any registers already taken.
             </div>
           )}
 
@@ -425,7 +445,7 @@ export default function SchoolCalendar() {
             color="tertiary"
             variant="contained"
             onClick={save}
-            disabled={saving}
+            disabled={saving || (startedClosed && !form.closesSchool)}
             sx={{
               color: "white",
               borderRadius: "10px",
