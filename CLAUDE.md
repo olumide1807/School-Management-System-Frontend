@@ -5,7 +5,7 @@ system aimed at Nigerian schools. The Express/Mongoose API lives in a
 **separate repo** (`School-Management-System-Backend`, usually a sibling
 folder on disk), served on **port 5002**.
 
-- Run: `npm run dev` · Build: `npm run build`
+- Run: `npm run dev` · Build: `npm run build` · Test: `npm test` (see §10)
 - API base URL: `src/Utils/apiRoute.ts` ← `.env` (`.env` is gitignored;
   `.env.example` is committed)
 - Stack: MUI v5 + Tailwind (both, see below), React Query v5, Redux Toolkit +
@@ -231,3 +231,34 @@ Also: `rename_jsx_to_tsx.py` and `note.txt` at the repo root are leftovers.
 - Loading: `Pages/loaders/Loader.tsx`, `LoaderOverlay.tsx`.
 - Tables: `Components/Tables/BasicTable.tsx` takes `headcells` + `tableData`,
   where a cell can be a React node (that's how action buttons are added).
+
+---
+
+## 10. Tests
+
+Vitest with jsdom, sharing `vite.config.ts`. `npm test` runs everything
+once; `npm run test:watch` reruns on save. Tests sit next to what they test
+as `*.test.ts(x)`; shared helpers are in `src/test/`.
+
+- **Component tests don't hit a server.** Mock React Query and the axios
+  instance with the stubs, then state what each query returns:
+  ```ts
+  vi.mock("@tanstack/react-query", () => import("<rel>/test/queryStub"));
+  vi.mock("<rel>/Utils/server", () => import("<rel>/test/serverStub"));
+  setQueries({ "child-fees": { data: {...} }, "child-profile": { error: { response: { status: 404 } } } });
+  ```
+  States are looked up by key prefix; `queryCalls` records the full keys
+  a page asked for. `serverStub` records requests, answers GETs via
+  `respond`, and `refuse` makes a call fail with the backend's 400 body.
+- `src/test/dom.tsx` renders and drives components (`mount`, `click`,
+  `setValue`, `renderText`).
+- **`queryKeys.test.ts` holds §3's rule over the whole of `src/`**: one key
+  prefix ⇒ one endpoint and one return expression, and only the six legacy
+  keys cache the whole axios response. If it fails, it names the files.
+- **Student page snapshots** (`Student/__snapshots__`) are the exact markup
+  students saw before the container/view split. A change there is a change
+  students will see: review it, then `npx vitest run -u` to accept.
+- `vitest.config.ts` rewrites `import { X } from "@mui/icons-material"` into
+  per-icon imports in tests only: loading the barrel (~10,000 modules) made
+  one test file take minutes to start. The app build is unaffected.
+

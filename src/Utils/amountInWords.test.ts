@@ -1,6 +1,5 @@
-// Run with: npm test   (or: node src/Utils/amountInWords.test.ts — Node 23.6+
-// runs TypeScript directly). No test framework: it throws on the first
-// failure, so a non-zero exit means something's wrong.
+// @vitest-environment node
+import { describe, expect, test } from "vitest";
 import { amountInWords } from "./amountInWords.ts";
 
 const cases: [number, string][] = [
@@ -35,15 +34,13 @@ const cases: [number, string][] = [
   [7000000001, "Seven billion and one naira only"],
 ];
 
-for (const [amount, expected] of cases) {
-  const got = amountInWords(amount);
-  if (got !== expected) throw new Error(`amountInWords(${amount}): expected "${expected}", got "${got}"`);
-}
+describe("amountInWords", () => {
+  test.each(cases)("%s → %s", (amount, expected) => {
+    expect(amountInWords(amount)).toBe(expected);
+  });
 
-for (const bad of [-5, NaN, Infinity]) {
-  let threw = false;
-  try { amountInWords(bad); } catch { threw = true; }
-  if (!threw) throw new Error(`amountInWords(${bad}) should throw rather than print nonsense`);
-}
-
-console.log(`amountInWords: ${cases.length + 3} checks passed`);
+  // Nonsense on a receipt is worse than an error
+  test.each([-5, NaN, Infinity])("throws on %s", (bad) => {
+    expect(() => amountInWords(bad)).toThrow();
+  });
+});
