@@ -75,35 +75,58 @@ one working session was two components using the same key for two different
 response shapes — one returned an array, the other an object, and whichever
 mounted second read the cached value of the first.
 
-Rules:
-- **A `queryFn` returns the response body — `res?.data` — never the whole
-  axios response.** Not `return res`, not `return await SERVER.get(...)`.
-  The body is the backend's `{ success, message, data }`; the axios response
-  wraps it in another layer (`status`, `headers`, `config`, and the body
-  under `data`). If one query under a key caches the body and another
-  caches the whole response, they cache different shapes under one key, and
-  whichever loads last decides what everyone reads — the rest get a list
-  one level off: empty, or a crash. This is not hypothetical: the crash that
-  started this project and both collisions the October key sweep found
-  (`["all-subjects"]`, `["timetable-grid", armId]`) were exactly this.
-- Don't reshape inside `queryFn` either (`return { armId, grid }`). Cache
-  the body as it came, and derive anything else in the component. The
-  key's parameters are already in the key — they aren't data.
-- A key identifies a *shape*, not a topic. Same key ⇒ same endpoint ⇒ same
-  shape, everywhere.
+### The rule — enforced by `src/test/queryKeys.test.ts`
+
+**One key means one endpoint and one shape, everywhere.** A key identifies
+a shape, not a topic. Every query whose key starts with the same string
+must call the same endpoint and return the same expression from its
+`queryFn`. If two don't, they cache different shapes under one key, and
+whichever loads last decides what every reader gets — the rest see a list
+one level off: empty, or a crash. That is how the crash that started this
+project happened, and both collisions the October key sweep found
+(`["all-subjects"]`, `["timetable-grid", armId]`).
+
+`queryKeys.test.ts` reads every `useQuery`/`useQueries` in `src/` and fails,
+naming the files, when:
+- two queries under one key prefix call different endpoints, or return
+  different expressions;
+- a query caches the whole axios response (`return res`, `return data`,
+  `return await SERVER.get(...)`) under any key but the six legacy ones
+  below, or a second query is added under a legacy key;
+- it finds a `queryFn` written in a form it can't read — extend
+  `src/test/queryKeys.ts` rather than letting it go unchecked.
+
+Before adding a query, search for its key. If the key exists, copy that
+query's endpoint and return exactly, or pick a new key.
+
+**Legacy keys.** Older hooks in `src/services/api-call.ts` cache the whole
+axios response, under keys nothing else uses: `["classes"]`,
+`["class-arms"]`, `["session"]`, `["all-session"]`, `["account-details"]`,
+`["annoucement"]`. That's why their callers read
+`levelsData?.data?.data?.data`. Never add a second query under one of them;
+convert the hook to `res?.data` (and its callers to one level less) first,
+as was done for `useGetAllSubjects`. When you convert one, remove it from
+`LEGACY_WHOLE_RESPONSE` in `queryKeys.test.ts` — the test expects exactly
+that list, so it fails until you do.
+
+### Preferences — not what all the code does
+
+These are what new queries should do, but the code doesn't consistently
+follow them, and nothing checks them. Of the 121 queries in October 2026,
+84 return the body; about 30 — including the student and parent portal
+pages — return `res?.data?.data`, add a `|| []`, or reshape. That's allowed
+as long as every query under the key does the same.
+- **Prefer returning the body, `res?.data`.** It's the backend's
+  `{ success, message, data }` as it came; the list is then one level down
+  in the component: `const rows = data?.data || []`. Unwrapping further
+  inside the `queryFn` works, but every other query under that key must
+  unwrap the same way, forever.
+- **Prefer not to reshape inside a `queryFn`** (`return { armId, grid }`).
+  Derive in the component instead; the key's parameters are already in the
+  key, they aren't data.
 - Include every parameter in the key: `["class-students", activeArmId]`.
 - Guard anyway. `Array.isArray(x) ? x : []` costs nothing and turns a white
   screen into an empty table.
-
-With the body cached, the list is one level down: `const rows = data?.data || []`.
-
-Some older hooks in `src/services/api-call.ts` still cache the whole axios
-response, under keys nothing else uses: `["classes"]`, `["class-arms"]`,
-`["session"]`, `["all-session"]`, `["account-details"]`, `["annoucement"]`.
-That's why their callers read `levelsData?.data?.data?.data`. They work only
-because no other query shares those keys. Never add a second query under
-one of them; convert the hook to `res?.data` (and its callers to one level
-less) first, as was done for `useGetAllSubjects`.
 
 Shared hooks: `src/hooks/useMyClasses.ts` (arms where the user is form
 teacher), `src/hooks/useMySubjects.ts` (subjects they teach). A teacher may
