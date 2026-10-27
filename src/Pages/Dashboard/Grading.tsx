@@ -12,6 +12,7 @@ import { toast } from "react-toastify";
 
 import SERVER from "../../Utils/server";
 import { toastOptions } from "../../Utils/toastOptions";
+import { bandFor, hasScorePrecision, roundScore } from "../../Utils/reportMarks";
 import { useClassLevels, useSessionTerm } from "../../services/api-call";
 import useMyClasses from "../../hooks/useMyClasses";
 import useMySubjects from "../../hooks/useMySubjects";
@@ -191,8 +192,11 @@ export default function Grading() {
     (attendanceData?.data || []).forEach((r: any) => {
       const sid = String(r.studentId);
       if (!tally[sid]) tally[sid] = { present: 0, scored: 0 };
+      // Auto-marked days are left out on both sides, as the report card
+      // does — counting them present but not in the total gave 11 of 10
+      if (r.autoMarked) return;
       if (r.status === "present") tally[sid].present++;
-      if (!r.autoMarked) tally[sid].scored++;
+      tally[sid].scored++;
     });
     students.forEach((s: any) => {
       const t = tally[String(s._id)];
@@ -215,12 +219,9 @@ export default function Grading() {
   });
   const gradeBands = gradesData?.data?.[0]?.grades || [];
 
+  // The same matching the report card uses (Utils/reportMarks.ts)
   const gradeFor = (total: number) =>
-    gradeBands.find(
-      (g: any) =>
-        total >= (g.scoreRange?.from ?? 0) &&
-        total <= (g.scoreRange?.to ?? 100),
-    );
+    bandFor(gradeBands, total, (g: any) => g.scoreRange?.from ?? 0) as any;
 
   // ---------- Existing scores ----------
   const { data: existingData } = useQuery({
@@ -269,6 +270,9 @@ export default function Grading() {
     if (Number.isNaN(value)) return "must be a number";
     if (value < 0 || value > (def?.maxScore ?? 100))
       return `must be between 0 and ${def?.maxScore}`;
+    // The server refuses more; say so here, before the teacher submits
+    if (!hasScorePrecision(value))
+      return "can have at most one decimal place (e.g. 12.5)";
     return null;
   };
 
@@ -295,7 +299,8 @@ export default function Grading() {
       return raw === "" || Number.isNaN(n) ? sum : sum + n;
     }, 0);
     const att = attendanceDef ? (attendanceMarks[studentId] ?? 0) : 0;
-    return manual + att;
+    // Rounded as the report card's total is, so the grade matches too
+    return roundScore(manual + att);
   };
 
   const rowComplete = (studentId: string) =>
