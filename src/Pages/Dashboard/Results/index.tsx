@@ -21,6 +21,7 @@ import useMyClasses from "../../../hooks/useMyClasses";
 import useMySubjects from "../../../hooks/useMySubjects";
 import Loader from "../../loaders/Loader";
 import ReportCard, { ordinal } from "./ReportCard";
+import IncompleteScoresDialog, { type IncompleteWarning } from "./IncompleteScoresDialog";
 import { toast } from "react-toastify";
 import Modal from "../../../Components/Modals";
 import { toastOptions } from "../../../Utils/toastOptions";
@@ -209,38 +210,51 @@ export default function Results() {
 
   const publication = meta?.publication;
 
-  const togglePublish = async () => {
-    const incomplete = reports.filter(
-      (r: any) => r.summary.subjectsGraded < r.summary.subjectsOffered,
-    ).length;
+  // Whether scores are incomplete is the server's call (409
+  // INCOMPLETE_SCORES at publish), so the screen and the server can't
+  // disagree about it. On that answer, IncompleteScoresDialog lists the
+  // gaps; publishing anyway resends with confirmIncomplete: true.
+  const [incompleteWarning, setIncompleteWarning] = useState<IncompleteWarning | null>(null);
+  const [publishing, setPublishing] = useState(false);
 
-    if (!publication?.published && incomplete > 0) {
-      const ok = window.confirm(
-        `${incomplete} of ${reports.length} students have subjects with no scores yet. ` +
-          `Their averages and positions will be based on what's been entered. Publish anyway?`,
-      );
-      if (!ok) return;
-    }
+  const refreshReport = () =>
+    queryClient.invalidateQueries({
+      queryKey: ["class-report", armId, termId, activeSession?._id],
+    });
 
+  const publish = async (confirmIncomplete = false) => {
+    setPublishing(true);
     try {
       const body = { classArmId: armId, termId, sessionId: activeSession._id };
-      if (publication?.published) {
-        await SERVER.delete("result/publish", { data: body });
-        toast.success("Results withdrawn", toastOptions);
-      } else {
-        await SERVER.post("result/publish", body);
-        toast.success("Results published", toastOptions);
-      }
-      await queryClient.invalidateQueries({
-        queryKey: ["class-report", armId, termId, activeSession?._id],
-      });
+      await SERVER.post("result/publish", confirmIncomplete ? { ...body, confirmIncomplete: true } : body);
+      setIncompleteWarning(null);
+      toast.success("Results published", toastOptions);
+      await refreshReport();
     } catch (error: any) {
-      toast.error(
-        error?.response?.data?.error || "Could not update",
-        toastOptions,
-      );
+      const data = error?.response?.data;
+      if (error?.response?.status === 409 && data?.code === "INCOMPLETE_SCORES") {
+        setIncompleteWarning({ message: data.error || "", incomplete: data.incomplete || [] });
+      } else {
+        toast.error(data?.error || "Could not publish", toastOptions);
+      }
+    } finally {
+      setPublishing(false);
     }
   };
+
+  const withdraw = async () => {
+    try {
+      await SERVER.delete("result/publish", {
+        data: { classArmId: armId, termId, sessionId: activeSession._id },
+      });
+      toast.success("Results withdrawn", toastOptions);
+      await refreshReport();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || "Could not withdraw", toastOptions);
+    }
+  };
+
+  const togglePublish = () => (publication?.published ? withdraw() : publish());
 
   if (availableArms.length === 0 && !armsData?.isPending) {
     return (
@@ -318,6 +332,7 @@ export default function Results() {
             permissions.canAccessSettings && (
               <button
                 onClick={togglePublish}
+                disabled={publishing}
                 className={`px-4 py-2.5 rounded-[10px] text-sm transition-colors ${
                   publication?.published
                     ? "text-text-sec border border-[#DEE0E0] hover:border-tertiary"
@@ -560,6 +575,13 @@ export default function Results() {
           </Button>
         </div>
       </Modal>
+
+      <IncompleteScoresDialog
+        warning={incompleteWarning}
+        publishing={publishing}
+        onCancel={() => setIncompleteWarning(null)}
+        onConfirm={() => publish(true)}
+      />
     </>
   );
 }
