@@ -1,48 +1,60 @@
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { OnboardingLayout2 } from "../../Templates/OnboardingLayout";
 import Button from "../../Components/Forms/Button";
-import { useEffect, useState } from "react";
 import { ErrorMsg } from "../../Components/Forms";
-import SERVER from '../../Utils/server'
-import AuthModal from '../../Components/Modals/AuthModal';
+import SERVER from "../../Utils/server";
+import AuthModal from "../../Components/Modals/AuthModal";
 import InputField from "../../Components/Forms/InputField";
+import { resetFailure } from "./passwordResetMessages";
 
-
+// Step 3 of 3: choose a new password. The single-use reset token from
+// step 2 arrives in router state — memory only, never storage — and is the
+// only thing the server needs to know whose password this is.
 const ResetPassword = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const resetToken: string | undefined = (location.state as any)?.resetToken;
+
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
   const [error, setError] = useState("");
-  const [email, setEmail] = useState("");
+  const [expired, setExpired] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  const [success, setSuccess] = useState(false)
+  // Opened without a code just verified (a typed URL, a closed tab)
+  if (!resetToken && !success) {
+    return (
+      <OnboardingLayout2>
+        <div className="flex flex-col items-center p-4 gap-6 text-center">
+          <h3 className="font-semibold text-2xl tracking-widest capitalize text-white">Reset password</h3>
+          <p className="text-lg text-white">
+            To choose a new password, first get a code by email and enter it.
+          </p>
+          <Link to="/forgot-password" className="text-primary text-lg">Get a code</Link>
+        </div>
+      </OnboardingLayout2>
+    );
+  }
 
-  useEffect(() => {
-    const storedEmail = localStorage.getItem("Email");
-
-    if (storedEmail) {
-      setEmail(storedEmail);
-    } else {
-      setError("Pls enter a valid email address to continue");
-    }
-  }, []);
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+    if (password.length < 7) return setError("Your new password needs at least 7 characters.");
+    if (password !== confirmPassword) return setError("The two passwords don't match.");
+    setSaving(true);
     try {
-      if (password.length < 7) {
-        return setError("Password must be at least 7 characters");
-      }
-
-      if (password !== confirmPassword) {
-        return setError("Password and Confirm Password must match");
-      }
-
-      const res = await SERVER.post(`superadmin/resetpassword?email=${email}`, {
-          password }
-      );
-      return res.data && window.location.replace('/')
-    } catch (error) {
-       setError('Reset token expired! Please try again later', error);
+      await SERVER.post("superadmin/resetpassword", { token: resetToken, password });
+      // The token is spent; drop it from this history entry too
+      navigate(location.pathname, { replace: true, state: null });
+      setSuccess(true);
+    } catch (err) {
+      const failure = resetFailure(err);
+      setError(failure.message);
+      setExpired(failure.kind === "expired");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -53,42 +65,45 @@ const ResetPassword = () => {
           <h3 className="font-semibold text-2xl tracking-widest mb-4 capitalize text-white">
             Reset password
           </h3>
-          <p className="text-lg text-white">
-            Please enter your new password to Login
-          </p>
+          <p className="text-lg text-white">Choose a new password of at least 7 characters.</p>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col">
           <div className="flex flex-col gap-y-9 my-4">
             <InputField
-              placeholder="Password"
+              placeholder="New password"
               type="password"
               required={true}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
             />
             <InputField
-              placeholder="Confirm password"
+              placeholder="Confirm new password"
               type="password"
               required={true}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
             />
           </div>
 
-          <Button text="Reset password" type="submit" />
+          <Button text="Reset password" type="submit" loading={saving} onClick={undefined} />
 
           {error && <ErrorMsg text={error} />}
+          {expired && (
+            <Link to="/forgot-password" className="mt-4 text-center text-primary text-lg">
+              Start again
+            </Link>
+          )}
         </form>
       </div>
-    
-      { success &&
-				<AuthModal 
-				open={success} 
-        setSuccess={setSuccess}
-				desc='Password Reset Successful!' 
-				message={`Your password has been successfully reset` }
-				url='/login'
-				btn='Login'
-				/>
-			}
+
+      {success && (
+        <AuthModal
+          open={success}
+          setSuccess={setSuccess}
+          desc="Password reset"
+          message="Your password has been changed. Sign in with your new password."
+          url="/login"
+          btn="Sign in"
+        />
+      )}
     </OnboardingLayout2>
   );
 };

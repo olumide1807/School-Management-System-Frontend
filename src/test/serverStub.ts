@@ -32,6 +32,8 @@ const call = async (method: Method, url: string, body?: unknown) => {
       : refusal;
     const e: any = new Error(`Request failed with status code ${status}`);
     e.response = { status, data };
+    // What axios.isAxiosError() checks, as on a real axios error
+    e.isAxiosError = true;
     throw e;
   }
   return { data: method === "GET" ? serverStub.respond(url) : { success: true, data: body } };
